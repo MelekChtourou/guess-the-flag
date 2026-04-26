@@ -268,13 +268,14 @@ function endRound(io, room) {
   }
 
   io.to(room.code).emit("round:end", {
-    round: room.round + 1,
-    total: room.questions.length,
-    correct: question.correct,
-    flagCode: question.flagCode,
-    fact: question.fact,
-    scores: publicPlayerList(room),
-    deadline: Date.now() + REVEAL_DURATION_MS,
+    round:     room.round + 1,
+    total:     room.questions.length,
+    correct:   question.correct,
+    flagCode:  question.flagCode,
+    continent: question.continent,
+    fact:      question.fact,
+    scores:    publicPlayerList(room),
+    deadline:  Date.now() + REVEAL_DURATION_MS,
   });
 
   // Auto-advance after the reveal window so a distracted host can't stall.

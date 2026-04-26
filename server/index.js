@@ -11,7 +11,7 @@ const http = require("http");
 const express = require("express");
 const { Server: SocketServer } = require("socket.io");
 
-const { buildQuestionSet } = require("./questions");
+const { buildQuestionSet, buildDailyQuestionSet, dailyDateString, dailyDayNumber } = require("./questions");
 const { registerSocketHandlers } = require("./gameManager");
 const { loadDetails } = require("./countryDetails");
 const { COUNTRIES } = require("./countries");
@@ -55,6 +55,21 @@ app.get("/api/solo-questions", (req, res) => {
   const requested = parseInt(req.query.count, 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
   res.json({ questions: buildQuestionSet(count) });
+});
+
+// Daily challenge. Same 10 questions for everyone on a given UTC day.
+// Cache for a few minutes — the date rolls over rarely, but we don't
+// want a 24h cache in case we ship a fix to the question generator.
+app.get("/api/daily-questions", (req, res) => {
+  const now = new Date();
+  const date = dailyDateString(now);
+  const dayNumber = dailyDayNumber(now);
+  res.set("Cache-Control", "public, max-age=300");
+  res.json({
+    date,
+    dayNumber,
+    questions: buildDailyQuestionSet(date, 10),
+  });
 });
 
 // Wire up multiplayer.

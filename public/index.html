@@ -61,6 +61,14 @@
         </div>
 
         <div class="menu-buttons">
+          <button id="menu-daily" class="menu-card menu-card-featured" data-action="daily">
+            <span class="menu-icon">★</span>
+            <span class="menu-text">
+              <span class="menu-label">Daily Challenge</span>
+              <span class="menu-sub">Today's flags — same for everyone</span>
+            </span>
+            <span class="menu-arrow">→</span>
+          </button>
           <button class="menu-card" data-action="solo">
             <span class="menu-icon">◐</span>
             <span class="menu-text">
@@ -87,7 +95,51 @@
           </button>
         </div>
 
+        <button id="menu-stats" class="profile-badge" data-action="stats">
+          <span id="profile-level">Lv. 0</span>
+          <span class="profile-divider">·</span>
+          <span id="profile-summary">0 correct</span>
+        </button>
+
         <footer class="menu-footer">made for the curious</footer>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- STATS                                                        -->
+      <!-- =========================================================== -->
+      <section id="screen-stats" class="screen">
+        <button class="back" data-action="back-to-menu" aria-label="Back">‹</button>
+        <h2 class="stats-title">Your stats</h2>
+
+        <!-- Big level / XP block -->
+        <div class="stats-hero">
+          <div class="stats-hero-level" id="stats-level">Lv. 0</div>
+          <div class="stats-hero-xp"    id="stats-xp">0 XP</div>
+        </div>
+
+        <!-- Three glance-tiles -->
+        <div class="stats-tiles">
+          <div class="stats-tile">
+            <div class="stats-tile-label">Best score</div>
+            <div class="stats-tile-value" id="stats-best">0</div>
+          </div>
+          <div class="stats-tile">
+            <div class="stats-tile-label">Longest streak</div>
+            <div class="stats-tile-value" id="stats-streak">0</div>
+          </div>
+          <div class="stats-tile">
+            <div class="stats-tile-label">Daily streak</div>
+            <div class="stats-tile-value" id="stats-daily-streak">0</div>
+          </div>
+          <div class="stats-tile">
+            <div class="stats-tile-label">Total correct</div>
+            <div class="stats-tile-value" id="stats-total-correct">0</div>
+          </div>
+        </div>
+
+        <!-- Per-continent grid -->
+        <div class="stats-section-title">By continent</div>
+        <div id="stats-continents" class="stats-continents"></div>
       </section>
 
       <!-- =========================================================== -->
@@ -206,6 +258,18 @@
       <section id="screen-results" class="screen">
         <h2 id="results-tier">Flag Master</h2>
         <div id="results-score" class="results-score">0 pts</div>
+
+        <!--
+          Share card — populated by daily.js or solo.js when the game ends.
+          Hidden by default for multiplayer (the order isn't reproducible
+          publicly so the grid wouldn't match other players' card).
+        -->
+        <div id="share-card" class="share-card" hidden>
+          <div class="share-grid"></div>
+          <div class="share-summary"></div>
+          <button class="btn btn-secondary share-btn">Share result</button>
+        </div>
+
         <ul id="results-scores" class="player-list" hidden></ul>
         <div class="results-actions">
           <button class="btn btn-primary" data-action="play-again">Play again</button>
@@ -221,10 +285,13 @@
     <script src="/js/theme.js"></script>
     <script src="/js/sound.js"></script>
     <script src="/js/ui.js"></script>
+    <script src="/js/profile.js"></script>
+    <script src="/js/share.js"></script>
     <script src="/js/colorExtractor.js"></script>
     <script src="/js/country.js"></script>
     <script src="/js/game.js"></script>
     <script src="/js/solo.js"></script>
+    <script src="/js/daily.js"></script>
     <script src="/js/multiplayer.js"></script>
     <script src="/js/app.js"></script>
     <!-- Globe is a defer-loaded ES module so it never blocks the rest of the page. -->

@@ -67,6 +67,14 @@
       state.revealDeadline = data.deadline || (Date.now() + 12000);
       window.Game.updateHud({ score: scoreFor(state.selfId) });
 
+      // Record this round into the persistent profile.
+      if (window.Profile) {
+        window.Profile.recordRound({
+          continent: data.continent,
+          correct: state.myPick === data.correct,
+        });
+      }
+
       // Show reveal panel + correct/wrong highlighting based on our own pick.
       const isHost = state.selfId === state.hostId;
       window.Game.revealAnswer(data.correct, state.myPick, {
@@ -86,6 +94,9 @@
     socket.on("game:end", (data) => {
       state.inGame = false;
       stopRevealTick();
+      // Record final score (the one displayed for this player) into profile.
+      const myScore = scoreFor(state.selfId);
+      if (window.Profile) window.Profile.recordGame({ score: myScore });
       showResults(data);
     });
 
@@ -155,6 +166,9 @@
       $("results-tier").textContent = "Game over";
     }
     $("results-score").textContent = `${scoreFor(state.selfId)} pts`;
+    // No share card for multiplayer — the room order isn't reproducible
+    // publicly, so the emoji grid wouldn't mean anything to recipients.
+    $("share-card").hidden = true;
     const list = $("results-scores");
     list.hidden = false;
     list.innerHTML = "";

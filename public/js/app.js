@@ -4,7 +4,7 @@
 //   - Hand off to Solo or Multiplayer controllers based on user choice
 
 (function () {
-  const SCREENS = ["menu", "nickname", "lobby", "game", "round-end", "results"];
+  const SCREENS = ["menu", "nickname", "lobby", "game", "round-end", "results", "stats"];
 
   // --- Routing -------------------------------------------------------
   function show(name) {
@@ -12,6 +12,46 @@
       const el = document.getElementById(`screen-${s}`);
       if (!el) return;
       el.classList.toggle("screen-active", s === name);
+    });
+    // Refresh derived UI on certain screens.
+    if (name === "menu" && window.Profile)  refreshProfileBadge();
+    if (name === "menu" && window.Daily)    window.Daily.refreshMenuCard();
+    if (name === "stats" && window.Profile) renderStatsScreen();
+  }
+
+  function refreshProfileBadge() {
+    const s = window.Profile.summary();
+    const lvl = document.getElementById("profile-level");
+    const sum = document.getElementById("profile-summary");
+    if (lvl) lvl.textContent = `Lv. ${s.level}`;
+    if (sum) sum.textContent = `${s.totalCorrect} correct`;
+  }
+
+  function renderStatsScreen() {
+    const p = window.Profile.get();
+    const lvl = window.Profile.level(p.xp);
+    document.getElementById("stats-level").textContent = `Lv. ${lvl}`;
+    document.getElementById("stats-xp").textContent = `${p.xp.toLocaleString("en-US")} XP`;
+    document.getElementById("stats-best").textContent = p.bestScore;
+    document.getElementById("stats-streak").textContent = p.longestStreak;
+    document.getElementById("stats-daily-streak").textContent = p.daily.currentStreak;
+    document.getElementById("stats-total-correct").textContent = p.totalCorrect;
+
+    // Continent rows — one per known continent, with a progress bar.
+    const continents = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
+    const wrap = document.getElementById("stats-continents");
+    wrap.innerHTML = "";
+    continents.forEach((name) => {
+      const stat = p.perContinent[name] || { correct: 0, total: 0 };
+      const pct = stat.total > 0 ? Math.round((stat.correct / stat.total) * 100) : 0;
+      const row = document.createElement("div");
+      row.className = "stats-continent";
+      row.innerHTML = `
+        <div class="stats-continent-bar" style="width: ${pct}%"></div>
+        <span class="stats-continent-name">${name}</span>
+        <span class="stats-continent-value">${stat.correct}/${stat.total}</span>
+      `;
+      wrap.appendChild(row);
     });
   }
 
@@ -84,10 +124,13 @@
       if (window.Sound) window.Sound.play("tap");
 
       if (action === "solo")          window.Solo.start();
+      else if (action === "daily")      window.Daily.start();
+      else if (action === "stats")      show("stats");
       else if (action === "create-room") openNicknameScreen("create-room");
       else if (action === "join-room")   openNicknameScreen("join-room");
       else if (action === "back-to-menu") {
         window.Solo.leave();
+        if (window.Daily) window.Daily.leave();
         window.Multiplayer.leave();
         show("menu");
       }
