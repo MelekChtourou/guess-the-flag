@@ -53,76 +53,85 @@
       <!-- =========================================================== -->
       <!-- MENU                                                         -->
       <!-- =========================================================== -->
-      <section id="screen-menu" class="screen screen-active">
+      <section id="screen-menu" class="screen screen-active screen-menu-fullscreen">
+
         <!--
-          Hero block: the Three.js globe sits at the center of an orbit
-          ring of mini-game cards. Both share the same square stage, so
-          the cards visually float around the planet.
-          orbit-ring rotates slowly via @keyframes; each card counter-
-          rotates to stay readable. Coming Soon cards are dimmed.
+          Full-screen 3D Atlas. The globe canvas now spans the whole
+          viewport behind the UI; the starfield + vignette layers add
+          depth around it. Tap a continent on the globe and the camera
+          tweens to it (handled in globe.js).
         -->
-        <div class="hero">
-          <div class="hub-stage">
-            <div id="globe-canvas" class="globe-canvas" aria-hidden="true"></div>
-            <div id="hero-fallback" class="hero-flag" aria-hidden="true" hidden>🌍</div>
-            <div class="orbit-ring">
-              <button class="hub-card" data-action="game" data-game="flag" style="--orbit-angle: 0deg">
-                <span class="hub-card-icon">🚩</span>
-                <span class="hub-card-name">Flags</span>
-              </button>
-              <button class="hub-card" data-action="game" data-game="capital" style="--orbit-angle: 90deg">
-                <span class="hub-card-icon">🏛</span>
-                <span class="hub-card-name">Capitals</span>
-              </button>
-              <button class="hub-card" data-action="game" data-game="population" style="--orbit-angle: 180deg">
-                <span class="hub-card-icon">📊</span>
-                <span class="hub-card-name">Showdown</span>
-              </button>
-              <button class="hub-card is-locked" disabled style="--orbit-angle: 270deg">
-                <span class="hub-card-icon">📍</span>
-                <span class="hub-card-name">Where</span>
-                <span class="hub-card-soon">Soon</span>
-              </button>
-            </div>
+        <div id="atlas-stage">
+          <div id="globe-canvas" aria-hidden="true"></div>
+          <div id="hero-fallback" aria-hidden="true" hidden>🌍</div>
+          <div class="atlas-starfield" aria-hidden="true"></div>
+          <div class="atlas-vignette" aria-hidden="true"></div>
+        </div>
+
+        <!-- Top floating header: brand + mode chips. -->
+        <header class="atlas-header">
+          <div class="atlas-brand">
+            <span class="atlas-brand-mark" aria-hidden="true">◯</span>
+            <span class="atlas-brand-name">ATLAS</span>
           </div>
-          <h1>Atlas</h1>
-          <p class="tagline">A world of geography mini-games.</p>
+          <div id="atlas-mode-chips" class="mode-chips" role="tablist" aria-label="Game mode">
+            <button class="mode-chip is-active" data-mode="solo"  role="tab" aria-selected="true">Solo</button>
+            <button class="mode-chip"           data-mode="multi" role="tab" aria-selected="false">Multi</button>
+            <button class="mode-chip"           data-mode="daily" role="tab" aria-selected="false">Daily</button>
+          </div>
+        </header>
+
+        <!-- Floating hint that fades out on first interaction. -->
+        <div id="atlas-hint" class="atlas-hint">
+          <span class="atlas-hint-arrow" aria-hidden="true">↻</span>
+          <span class="atlas-hint-text">Drag to spin · tap a continent</span>
         </div>
 
-        <div class="menu-buttons">
-          <button id="menu-daily" class="menu-card menu-card-featured" data-action="daily">
-            <span class="menu-icon">★</span>
-            <span class="menu-text">
-              <span class="menu-label">Daily Challenge</span>
-              <span class="menu-sub">Today's flags — same for everyone</span>
-            </span>
-            <span class="menu-arrow">→</span>
-          </button>
-          <button class="menu-card" data-action="create-room">
-            <span class="menu-icon">★</span>
-            <span class="menu-text">
-              <span class="menu-label">Multiplayer</span>
-              <span class="menu-sub">Create a room with a 4-letter code</span>
-            </span>
-            <span class="menu-arrow">→</span>
-          </button>
-          <button class="menu-card" data-action="join-room">
-            <span class="menu-icon">⌗</span>
-            <span class="menu-text">
-              <span class="menu-label">Join Room</span>
-              <span class="menu-sub">Punch in a friend's code</span>
-            </span>
-            <span class="menu-arrow">→</span>
+        <!-- Continent label: appears once a region is selected. -->
+        <div id="continent-label" class="continent-label" hidden>
+          <div class="continent-label-eyebrow">Region</div>
+          <div class="continent-label-name" id="continent-name">All world</div>
+          <button class="continent-label-clear" data-action="clear-continent" aria-label="Clear region">×</button>
+        </div>
+
+        <!-- Bottom tray: 3 mini-game cards + daily quick link. -->
+        <div id="atlas-tray" class="atlas-tray">
+          <div class="tray-handle" aria-hidden="true"></div>
+          <div class="tray-games">
+            <button class="tray-card" data-action="game" data-game="flag">
+              <span class="tray-card-icon">🚩</span>
+              <span class="tray-card-name">Flags</span>
+              <span class="tray-card-sub">Identify the flag</span>
+            </button>
+            <button class="tray-card" data-action="game" data-game="capital">
+              <span class="tray-card-icon">🏛</span>
+              <span class="tray-card-name">Capitals</span>
+              <span class="tray-card-sub">From a city to a country</span>
+            </button>
+            <button class="tray-card" data-action="game" data-game="population">
+              <span class="tray-card-icon">📊</span>
+              <span class="tray-card-name">Showdown</span>
+              <span class="tray-card-sub">A vs B — bigger?</span>
+            </button>
+          </div>
+
+          <!-- Multi-only actions (revealed when Multi chip is active). -->
+          <div id="tray-multi-actions" class="tray-multi-actions" hidden>
+            <button class="btn btn-secondary tray-action" data-action="join-room">Join with code</button>
+          </div>
+
+          <!-- Daily quick link, always visible at the bottom. -->
+          <button id="menu-daily-quick" class="tray-daily" data-action="daily">
+            <span class="tray-daily-eyebrow">★ DAILY</span>
+            <span class="tray-daily-text" id="tray-daily-text">Today's challenge</span>
+            <span class="tray-daily-arrow">→</span>
           </button>
         </div>
 
-        <button id="menu-stats" class="profile-badge" data-action="stats">
+        <!-- Floating profile badge — top-left, mirrors the topbar. -->
+        <button id="menu-stats" class="atlas-profile-fab" data-action="stats" aria-label="Stats">
           <span id="profile-level">Lv. 0</span>
-          <span class="profile-divider">·</span>
-          <span id="profile-summary">0 correct</span>
         </button>
-
-        <footer class="menu-footer">made for the curious</footer>
       </section>
 
       <!-- =========================================================== -->
@@ -389,6 +398,7 @@
     <script src="/js/games/population.js"></script>
     <script src="/js/daily.js"></script>
     <script src="/js/multiplayer.js"></script>
+    <script src="/js/menu.js"></script>
     <script src="/js/router.js"></script>
     <script src="/js/app.js"></script>
     <!-- Globe is a defer-loaded ES module so it never blocks the rest of the page. -->

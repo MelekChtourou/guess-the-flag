@@ -99,8 +99,11 @@
 
   function handle(path) {
     current = path;
+    // Strip the query string so `/flag?continent=Africa` still matches
+    // the `/flag` route pattern.
+    const pathname = (path || "/").split("?")[0].split("#")[0];
     for (const r of ROUTES) {
-      const m = path.match(r.match);
+      const m = pathname.match(r.match);
       if (m) {
         try { r.handler(...m); } catch (e) { console.error(e); }
         return;

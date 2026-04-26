@@ -65,25 +65,36 @@ app.get("/api/country/:code", async (req, res) => {
   }
 });
 
+// Whitelist of continents we accept as a filter — protects the server
+// from arbitrary strings making their way into our pool filters.
+const VALID_CONTINENTS = new Set(["Africa", "Asia", "Europe", "North America", "South America", "Oceania"]);
+function continentParam(req) {
+  const c = typeof req.query.continent === "string" ? req.query.continent : null;
+  return c && VALID_CONTINENTS.has(c) ? c : null;
+}
+
 // Solo question set. Client controls its own timer and scoring.
 app.get("/api/solo-questions", (req, res) => {
   const requested = parseInt(req.query.count, 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
-  res.json({ questions: buildQuestionSet(count) });
+  const continent = continentParam(req);
+  res.json({ questions: buildQuestionSet(count, Math.random, { continent }) });
 });
 
 // Capital-game question set: capital city → 4 country options.
 app.get("/api/capital-questions", (req, res) => {
   const requested = parseInt(req.query.count, 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
-  res.json({ questions: buildCapitalQuestionSet(count) });
+  const continent = continentParam(req);
+  res.json({ questions: buildCapitalQuestionSet(count, Math.random, { continent }) });
 });
 
 // Population Showdown question set: pairs of countries to compare.
 app.get("/api/population-questions", (req, res) => {
   const requested = parseInt(req.query.count, 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
-  res.json({ questions: buildPopulationQuestionSet(count) });
+  const continent = continentParam(req);
+  res.json({ questions: buildPopulationQuestionSet(count, Math.random, { continent }) });
 });
 
 // Daily challenge. Same 10 questions for everyone on a given UTC day.

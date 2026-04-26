@@ -78,8 +78,17 @@ function buildQuestion(country, rng = Math.random) {
   };
 }
 
-function buildQuestionSet(count = 10, rng = Math.random) {
-  const picks = shuffle(COUNTRIES, rng).slice(0, count);
+function buildQuestionSet(count = 10, rng = Math.random, opts = {}) {
+  // Optional continent filter: only sample correct answers from this
+  // continent (distractors still come from same-continent neighbors so
+  // the question stays sensible).
+  const pool = opts.continent
+    ? COUNTRIES.filter((c) => c.continent === opts.continent)
+    : COUNTRIES;
+  // Fall back to global pool if the requested continent doesn't have
+  // enough entries (shouldn't happen for the 6 main continents).
+  const source = pool.length >= count ? pool : COUNTRIES;
+  const picks = shuffle(source, rng).slice(0, count);
   return picks.map((c) => buildQuestion(c, rng));
 }
 
@@ -128,8 +137,12 @@ function buildCapitalQuestion(country, rng = Math.random) {
   };
 }
 
-function buildCapitalQuestionSet(count = 10, rng = Math.random) {
-  const picks = shuffle(COUNTRIES_WITH_CAPITAL, rng).slice(0, count);
+function buildCapitalQuestionSet(count = 10, rng = Math.random, opts = {}) {
+  const pool = opts.continent
+    ? COUNTRIES_WITH_CAPITAL.filter((c) => c.continent === opts.continent)
+    : COUNTRIES_WITH_CAPITAL;
+  const source = pool.length >= count ? pool : COUNTRIES_WITH_CAPITAL;
+  const picks = shuffle(source, rng).slice(0, count);
   return picks.map((c) => buildCapitalQuestion(c, rng));
 }
 
@@ -147,12 +160,16 @@ const COUNTRIES_WITH_POP = COUNTRIES.filter(
 const POP_RATIO_MIN = 1.3;
 const POP_RATIO_MAX = 6.0;
 
-function pickPopulationPair(rng) {
-  // Try a handful of times to find a pair within the target ratio band;
-  // fall back to whatever we drew last if nothing fits.
+function pickPopulationPair(rng, opts = {}) {
+  // Optional continent filter — pull both countries from the same continent.
+  const filteredPool = opts.continent
+    ? COUNTRIES_WITH_POP.filter((c) => c.continent === opts.continent)
+    : COUNTRIES_WITH_POP;
+  const source = filteredPool.length >= 2 ? filteredPool : COUNTRIES_WITH_POP;
+
   let pair = null;
   for (let i = 0; i < 30; i++) {
-    const shuffled = shuffle(COUNTRIES_WITH_POP, rng);
+    const shuffled = shuffle(source, rng);
     const a = shuffled[0];
     const b = shuffled[1];
     const popA = COUNTRY_DATA[a.code].population;
@@ -164,12 +181,10 @@ function pickPopulationPair(rng) {
   return pair;
 }
 
-function buildPopulationQuestion(rng = Math.random) {
-  const { a, b } = pickPopulationPair(rng);
+function buildPopulationQuestion(rng = Math.random, opts = {}) {
+  const { a, b } = pickPopulationPair(rng, opts);
   const popA = COUNTRY_DATA[a.code].population;
   const popB = COUNTRY_DATA[b.code].population;
-  // We send populations to the client so it can reveal them after the
-  // answer; the "correct" field tells us the bigger one.
   return {
     a: { code: a.code, name: a.name, population: popA, continent: a.continent },
     b: { code: b.code, name: b.name, population: popB, continent: b.continent },
@@ -177,8 +192,8 @@ function buildPopulationQuestion(rng = Math.random) {
   };
 }
 
-function buildPopulationQuestionSet(count = 10, rng = Math.random) {
-  return Array.from({ length: count }, () => buildPopulationQuestion(rng));
+function buildPopulationQuestionSet(count = 10, rng = Math.random, opts = {}) {
+  return Array.from({ length: count }, () => buildPopulationQuestion(rng, opts));
 }
 
 module.exports = {

@@ -38,7 +38,10 @@
   }
 
   async function fetchQuestions(count = 10) {
-    const res = await fetch(`/api/capital-questions?count=${count}`);
+    const continent = window.Menu && window.Menu.continentFromUrl();
+    const params = new URLSearchParams({ count: String(count) });
+    if (continent) params.set("continent", continent);
+    const res = await fetch(`/api/capital-questions?${params}`);
     if (!res.ok) throw new Error("Failed to load questions");
     const data = await res.json();
     return data.questions;
