@@ -1,0 +1,79 @@
+# CI/CD: build the Docker image, push to GHCR, then SSH into the VPS
+# and pull + restart the container.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   SSH_HOST   — the VPS hostname or IP
+#   SSH_USER   — login user (e.g. "debian")
+#   SSH_PORT   — usually "22"
+#   SSH_KEY    — private key (the matching public key must be in
+#                ~/.ssh/authorized_keys on the VPS for SSH_USER)
+#
+# The image goes to ghcr.io/<owner>/<repo>:latest (and a sha-tagged
+# variant for traceable rollbacks).
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lowercase image name
+        # GHCR requires lowercase image names; repo owners can be mixed-case.
+        id: imgname
+        run: echo "image=$(echo '${{ env.IMAGE_NAME }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.imgname.outputs.image }}:latest
+            ${{ env.REGISTRY }}/${{ steps.imgname.outputs.image }}:${{ github.sha }}
+          # GHA cache makes subsequent builds dramatically faster.
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          port:     ${{ secrets.SSH_PORT }}
+          key:      ${{ secrets.SSH_KEY }}
+          # Hard-fail on any error in the script so a bad deploy doesn't
+          # silently report success.
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd /opt/guess-the-flag
+            docker-compose pull
+            docker-compose up -d
+            # Reap old/dangling images to keep disk usage in check.
+            docker image prune -f
+            echo "deployed: $(docker ps --filter name=guess-the-flag --format '{{.Status}}')"

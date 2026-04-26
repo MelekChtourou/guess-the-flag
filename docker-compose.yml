@@ -1,0 +1,30 @@
+# Production docker-compose for the VPS.
+#
+# - Image is pulled from GHCR after the GitHub Actions workflow pushes it.
+# - Port is bound to 127.0.0.1 only — Caddy on the host terminates TLS
+#   and reverse-proxies to it. The container is not directly exposed.
+# - PORT=3000 inside the container; published to 3100 on the host (chosen
+#   because that range was free on the VPS at setup time).
+
+services:
+  app:
+    image: ghcr.io/melekchtourou/guess-the-flag:latest
+    container_name: guess-the-flag
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    healthcheck:
+      # Tiny inline check — no extra tools needed in the image.
+      test: ["CMD-SHELL", "wget -qO- --tries=1 --timeout=2 http://localhost:3000/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

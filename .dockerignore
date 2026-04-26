@@ -1,0 +1,14 @@
+# Anything that doesn't belong in the build context.
+.git
+.github
+.gitignore
+.dockerignore
+.claude
+node_modules
+npm-debug.log
+README.md
+deploy
+*.log
+.DS_Store
+.env
+.env.*

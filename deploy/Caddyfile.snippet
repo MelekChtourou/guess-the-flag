@@ -1,0 +1,28 @@
+# Caddy site block for guess-flag.mohamedmelekchtourou.com.
+#
+# Append this to /etc/caddy/Caddyfile (or include it from there) and run:
+#   sudo caddy reload --config /etc/caddy/Caddyfile
+#
+# Caddy handles WebSocket upgrade automatically with `reverse_proxy`,
+# so Socket.IO works without any extra config.
+
+guess-flag.mohamedmelekchtourou.com {
+  reverse_proxy localhost:3100
+
+  encode gzip zstd
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options    "nosniff"
+    Referrer-Policy           "strict-origin-when-cross-origin"
+    X-Frame-Options           "SAMEORIGIN"
+    -Server
+  }
+
+  log {
+    output file /var/log/caddy/guess-flag.log {
+      roll_size 20mb
+      roll_keep 7
+    }
+  }
+}

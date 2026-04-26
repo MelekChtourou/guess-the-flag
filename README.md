@@ -135,47 +135,77 @@ the lifetime of the process, so each country is loaded at most once.
 
 ---
 
-## Deploy to a VPS
+## Deploy
 
-These instructions assume Debian/Ubuntu with nginx already installed.
+Docker container behind Caddy, deployed automatically by GitHub Actions
+on every push to `main`.
 
-```bash
-# 1. Get the code on the server
-sudo mkdir -p /var/www/guess-the-flag
-sudo chown $USER:$USER /var/www/guess-the-flag
-git clone https://github.com/MelekChtourou/guess-the-flag.git /var/www/guess-the-flag
-cd /var/www/guess-the-flag
-npm ci --omit=dev
-
-# 2. systemd service
-sudo cp deploy/guess-flag.service.example /etc/systemd/system/guess-flag.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now guess-flag
-systemctl status guess-flag
-
-# 3. nginx reverse proxy (WebSocket upgrade is essential for Socket.IO)
-sudo cp deploy/nginx.conf.example /etc/nginx/sites-available/guess-flag.conf
-sudo ln -s /etc/nginx/sites-available/guess-flag.conf /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-
-# 4. HTTPS via Let's Encrypt (once DNS points at the VPS)
-sudo certbot --nginx -d guess-flag.mohamedmelekchtourou.com
+```
+┌──────────┐  push   ┌──────────┐  build+push   ┌──────┐  pull   ┌─────────┐
+│ git main │────────▶│  GH CI   │──────────────▶│ GHCR │────────▶│ VPS     │
+└──────────┘         └──────────┘                └──────┘         │ docker  │
+                                                                  │  ↓      │
+                                                              port 3100      │
+                                                                  ↑          │
+                                                                Caddy ────TLS┘
 ```
 
-### Updating
+### One-time VPS setup
 
 ```bash
-cd /var/www/guess-the-flag
-git pull
-npm ci --omit=dev
-sudo systemctl restart guess-flag
+# (the VPS already has docker, docker-compose v2, and Caddy)
+
+sudo mkdir -p /opt/guess-the-flag
+sudo chown $USER:$USER /opt/guess-the-flag
+# Copy the docker-compose.yml from this repo into /opt/guess-the-flag/.
+
+# Append the contents of deploy/Caddyfile.snippet to /etc/caddy/Caddyfile
+# and reload:
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo systemctl reload caddy
 ```
+
+### CI/CD secrets
+
+Add these in **Settings → Secrets and variables → Actions**:
+
+| Secret      | Value                                                 |
+|-------------|-------------------------------------------------------|
+| `SSH_HOST`  | VPS hostname or IP                                    |
+| `SSH_USER`  | login user (e.g. `debian`)                            |
+| `SSH_PORT`  | SSH port (usually `22`)                               |
+| `SSH_KEY`   | Private key (matching public key in `~/.ssh/authorized_keys` on the VPS) |
+
+Generate a deploy-only key on the VPS to avoid reusing your main key:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/gha_guess_the_flag -N "" -C "github-actions/guess-the-flag"
+cat ~/.ssh/gha_guess_the_flag.pub >> ~/.ssh/authorized_keys
+cat ~/.ssh/gha_guess_the_flag       # paste this into the SSH_KEY secret
+```
+
+### Deploy
+
+`git push` to `main` runs `.github/workflows/deploy.yml`, which:
+1. Builds the Docker image with cache from GHCR.
+2. Pushes it to `ghcr.io/<owner>/<repo>:latest` (and a SHA-tagged variant).
+3. SSHes into the VPS, runs `docker-compose pull && docker-compose up -d`.
+
+You can also trigger a deploy manually from the **Actions** tab.
 
 ### Logs
 
 ```bash
-sudo journalctl -u guess-flag -f
+ssh <vps>
+docker logs -f guess-the-flag           # app
+sudo tail -f /var/log/caddy/guess-flag.log   # http access
 ```
+
+### Rollback
+
+Image tags are SHA-pinned. To roll back, edit `/opt/guess-the-flag/docker-compose.yml`
+on the VPS, change `:latest` to the SHA of a known-good build, then
+`docker-compose up -d`.
 
 ---
 
