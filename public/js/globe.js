@@ -31,7 +31,8 @@
   ];
 
   let renderer, scene, camera, earth, atmosphere, marker, borders, THREE;
-  let renderTimer = null;
+  let renderHandle = null;        // requestAnimationFrame id
+  let lastFrameTime = 0;          // ms timestamp of the last frame
   let bootAttempted = false;
   let supported = true;
   let countryFeatures = null;   // [{ id, name, type, coords }, ...] from topojson-mini, or null
@@ -41,10 +42,14 @@
   // breaking the centering math (which assumes pitch is part of rot, not
   // baked into the formula).
   const rot = { x: 0.18, y: 0, velX: 0, velY: 0 };
-  const AUTO_DRIFT_Y = 0.0025;
-  const VEL_DECAY    = 0.94;
-  const DRAG_SENS    = 0.005;
-  const PITCH_LIMIT  = 1.2;
+  // Drift speed expressed in radians/second so it stays consistent across
+  // frame rates (60 Hz desktop vs 120 Hz tablets, etc).
+  const AUTO_DRIFT_RAD_PER_SEC = 0.075;
+  // Velocity half-life: how long it takes the post-drag momentum to halve.
+  // Shorter = quicker stop, longer = longer glide.
+  const VEL_HALF_LIFE_MS = 320;
+  const DRAG_SENS        = 0.005;
+  const PITCH_LIMIT      = 1.2;
   let dragging = false;
   let lastIdleAt = 0;
   const IDLE_RESUME_MS = 1500;
@@ -490,30 +495,40 @@
 
     attachInteraction(renderer.domElement);
 
-    const TICK_MS = 1000 / 30;
-    function tick() {
-      // Camera + rotation tween.
+    // requestAnimationFrame loop (smoother than setInterval — runs at
+    // the display's refresh rate). We compute a per-frame delta in
+    // seconds so motion is frame-rate independent: 60Hz, 120Hz, or a
+    // throttled tab all rotate the globe at the same visible speed.
+    function tick(now) {
+      const dt = lastFrameTime ? Math.min(0.1, (now - lastFrameTime) / 1000) : 0.016;
+      lastFrameTime = now;
+
+      // Camera + rotation tween (time-based via tween.t0 + tween.dur).
       if (tween) {
-        const t = Math.min(1, (performance.now() - tween.t0) / tween.dur);
+        const t = Math.min(1, (now - tween.t0) / tween.dur);
         const e = easeOutQuart(t);
         rot.x = tween.fromX    + (tween.toX    - tween.fromX)    * e;
         rot.y = tween.fromY    + (tween.toY    - tween.fromY)    * e;
         camZ  = tween.fromZ    + (tween.toZ    - tween.fromZ)    * e;
         camY  = tween.fromCamY + (tween.toCamY - tween.fromCamY) * e;
         camera.position.set(0, camY, camZ);
-        if (t >= 1) { tween = null; lastIdleAt = performance.now(); }
+        if (t >= 1) { tween = null; lastIdleAt = now; }
       } else if (!dragging) {
         if (Math.abs(rot.velX) > 0.0001 || Math.abs(rot.velY) > 0.0001) {
-          rot.x += rot.velX;
-          rot.y += rot.velY;
-          rot.velX *= VEL_DECAY;
-          rot.velY *= VEL_DECAY;
+          // Apply velocity scaled to the actual frame delta.
+          rot.x += rot.velX * dt * 60;
+          rot.y += rot.velY * dt * 60;
+          // Exponential decay with a half-life so momentum feels the same
+          // regardless of frame rate.
+          const decay = Math.pow(0.5, (dt * 1000) / VEL_HALF_LIFE_MS);
+          rot.velX *= decay;
+          rot.velY *= decay;
           if (rot.x >  PITCH_LIMIT) { rot.x =  PITCH_LIMIT; rot.velX = 0; }
           if (rot.x < -PITCH_LIMIT) { rot.x = -PITCH_LIMIT; rot.velX = 0; }
-          lastIdleAt = performance.now();
-        } else if (performance.now() - lastIdleAt > IDLE_RESUME_MS && camZ > CAM_OUT_Z - 0.05) {
-          // Only auto-spin when fully zoomed out.
-          rot.y += AUTO_DRIFT_Y;
+          lastIdleAt = now;
+        } else if (now - lastIdleAt > IDLE_RESUME_MS && camZ > CAM_OUT_Z - 0.05) {
+          // Only auto-spin when fully zoomed out, time-based for consistency.
+          rot.y += AUTO_DRIFT_RAD_PER_SEC * dt;
         }
       }
 
@@ -523,14 +538,19 @@
       atmosphere.rotation.y = rot.y;
 
       renderer.render(scene, camera);
+      renderHandle = requestAnimationFrame(tick);
     }
-    renderTimer = setInterval(tick, TICK_MS);
+    renderHandle = requestAnimationFrame(tick);
 
+    // Pause the loop entirely when the tab is hidden (saves battery
+    // and avoids huge dt jumps when it resumes).
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden && renderTimer) {
-        clearInterval(renderTimer); renderTimer = null;
-      } else if (!document.hidden && !renderTimer) {
-        renderTimer = setInterval(tick, TICK_MS);
+      if (document.hidden) {
+        if (renderHandle) { cancelAnimationFrame(renderHandle); renderHandle = null; }
+      } else if (!renderHandle) {
+        // Reset frame timing so the first dt after a long pause isn't huge.
+        lastFrameTime = 0;
+        renderHandle = requestAnimationFrame(tick);
       }
     });
 

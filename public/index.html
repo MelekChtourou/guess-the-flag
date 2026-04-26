@@ -66,54 +66,79 @@
           </div>
 
           <!--
-            Sun + Moon = the theme toggles. They live in the background
-            far from the globe (top corners), are always visible, and
-            always swap places animation-wise when you tap one. The
-            currently-active theme's body glows and pulls forward.
-            Click a celestial body → setTheme + visual swap.
+            Sun + Moon = theme toggles. The sun is anchored top-CENTER
+            of the viewport (always centered horizontally, like a sun
+            in the sky above the planet). The moon sits opposite it.
+            Both are SVG with a multi-layer radial halo built INSIDE
+            the SVG (no CSS drop-shadow on the rays — that produced an
+            ugly star-shaped glow). Active body = full opacity + scaled
+            up; inactive recedes.
           -->
           <button id="celestial-sun" class="celestial celestial-sun" aria-label="Light theme">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
               <defs>
-                <radialGradient id="sun-grad" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%"  stop-color="#fff5d6"/>
-                  <stop offset="50%" stop-color="#ffd76e"/>
-                  <stop offset="100%" stop-color="#ff9c3a"/>
+                <radialGradient id="sun-halo-3" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"  stop-color="rgba(255,196,108,0.55)"/>
+                  <stop offset="60%" stop-color="rgba(255,196,108,0.10)"/>
+                  <stop offset="100%" stop-color="rgba(255,196,108,0)"/>
+                </radialGradient>
+                <radialGradient id="sun-halo-2" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"  stop-color="rgba(255,210,120,0.85)"/>
+                  <stop offset="55%" stop-color="rgba(255,180,80,0.20)"/>
+                  <stop offset="100%" stop-color="rgba(255,180,80,0)"/>
+                </radialGradient>
+                <radialGradient id="sun-body" cx="40%" cy="40%" r="60%">
+                  <stop offset="0%"   stop-color="#fff3cd"/>
+                  <stop offset="55%"  stop-color="#ffd680"/>
+                  <stop offset="100%" stop-color="#f59e2c"/>
                 </radialGradient>
               </defs>
+              <!-- Three concentric halo layers, all centered on the body. -->
+              <circle class="sun-glow-outer" cx="100" cy="100" r="98" fill="url(#sun-halo-3)"/>
+              <circle class="sun-glow-mid"   cx="100" cy="100" r="62" fill="url(#sun-halo-2)"/>
+              <!-- Subtle rotating rays — thin, refined, behind the body. -->
               <g class="sun-rays">
-                <g class="ray-group">
-                  <rect x="48" y="2"  width="4" height="14" rx="2" fill="#ffd76e"/>
-                  <rect x="48" y="84" width="4" height="14" rx="2" fill="#ffd76e"/>
-                  <rect x="2"  y="48" width="14" height="4" rx="2" fill="#ffd76e"/>
-                  <rect x="84" y="48" width="14" height="4" rx="2" fill="#ffd76e"/>
+                <g>
+                  <rect x="98.5" y="22" width="3" height="14" rx="1.5" fill="#ffd680" opacity="0.55"/>
+                  <rect x="98.5" y="164" width="3" height="14" rx="1.5" fill="#ffd680" opacity="0.55"/>
+                  <rect x="22"  y="98.5" width="14" height="3" rx="1.5" fill="#ffd680" opacity="0.55"/>
+                  <rect x="164" y="98.5" width="14" height="3" rx="1.5" fill="#ffd680" opacity="0.55"/>
                 </g>
-                <g class="ray-group" transform="rotate(45 50 50)">
-                  <rect x="48" y="6"  width="4" height="10" rx="2" fill="#ffd76e" opacity="0.85"/>
-                  <rect x="48" y="84" width="4" height="10" rx="2" fill="#ffd76e" opacity="0.85"/>
-                  <rect x="6"  y="48" width="10" height="4" rx="2" fill="#ffd76e" opacity="0.85"/>
-                  <rect x="84" y="48" width="10" height="4" rx="2" fill="#ffd76e" opacity="0.85"/>
+                <g transform="rotate(45 100 100)">
+                  <rect x="98.5" y="28" width="3" height="10" rx="1.5" fill="#ffd680" opacity="0.4"/>
+                  <rect x="98.5" y="162" width="3" height="10" rx="1.5" fill="#ffd680" opacity="0.4"/>
+                  <rect x="28"  y="98.5" width="10" height="3" rx="1.5" fill="#ffd680" opacity="0.4"/>
+                  <rect x="162" y="98.5" width="10" height="3" rx="1.5" fill="#ffd680" opacity="0.4"/>
                 </g>
               </g>
-              <circle cx="50" cy="50" r="22" fill="url(#sun-grad)"/>
+              <!-- Body on top of the halo. -->
+              <circle cx="100" cy="100" r="28" fill="url(#sun-body)"/>
             </svg>
           </button>
 
           <button id="celestial-moon" class="celestial celestial-moon" aria-label="Dark theme">
-            <svg viewBox="0 0 100 100" aria-hidden="true">
+            <svg viewBox="0 0 200 200" aria-hidden="true">
               <defs>
-                <radialGradient id="moon-grad" cx="40%" cy="40%" r="60%">
-                  <stop offset="0%"  stop-color="#f4f1e6"/>
-                  <stop offset="60%" stop-color="#cfc9b6"/>
-                  <stop offset="100%" stop-color="#888470"/>
+                <radialGradient id="moon-halo" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"  stop-color="rgba(220,228,255,0.40)"/>
+                  <stop offset="60%" stop-color="rgba(180,200,255,0.08)"/>
+                  <stop offset="100%" stop-color="rgba(180,200,255,0)"/>
+                </radialGradient>
+                <radialGradient id="moon-body" cx="40%" cy="38%" r="62%">
+                  <stop offset="0%"  stop-color="#f6f1e0"/>
+                  <stop offset="60%" stop-color="#c8c2ac"/>
+                  <stop offset="100%" stop-color="#7a7665"/>
                 </radialGradient>
               </defs>
-              <circle cx="50" cy="50" r="30" fill="url(#moon-grad)"/>
-              <!-- Soft craters -->
-              <circle cx="40" cy="38" r="4"   fill="#9c987f" opacity="0.45"/>
-              <circle cx="58" cy="48" r="3"   fill="#9c987f" opacity="0.4"/>
-              <circle cx="46" cy="60" r="2.5" fill="#9c987f" opacity="0.35"/>
-              <circle cx="62" cy="62" r="1.8" fill="#9c987f" opacity="0.4"/>
+              <!-- Soft circular halo behind the moon body. -->
+              <circle class="moon-glow-outer" cx="100" cy="100" r="92" fill="url(#moon-halo)"/>
+              <!-- Body. -->
+              <circle cx="100" cy="100" r="36" fill="url(#moon-body)"/>
+              <!-- Subtle craters. -->
+              <circle cx="86"  cy="84"  r="5"   fill="#9c977f" opacity="0.45"/>
+              <circle cx="112" cy="100" r="3.5" fill="#9c977f" opacity="0.4"/>
+              <circle cx="92"  cy="116" r="3"   fill="#9c977f" opacity="0.35"/>
+              <circle cx="116" cy="118" r="2"   fill="#9c977f" opacity="0.4"/>
             </svg>
           </button>
 

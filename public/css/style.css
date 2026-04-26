@@ -336,69 +336,105 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 @keyframes stars-twinkle-b { from { opacity: 0.30; } to { opacity: 0.75; } }
 
 /* --- Celestial theme toggles (sun + moon) -----------------------
-   Two interactive bodies in the background. They sit far from the
-   globe (top corners), are always visible regardless of theme, and
-   tap = swap theme. The active theme's body glows; the inactive
-   one is dim and recedes a little.                                  */
+
+   The sun is anchored TOP-CENTER of the viewport — always centered
+   horizontally, like a real sun in the sky above the globe. The moon
+   sits opposite (top-right, far from the brand on the left). Each
+   body is built with proper concentric SVG halos (no CSS drop-shadow
+   on the rays, which used to give an ugly star-shaped glow).
+
+   Active theme = scaled to full size + halo visible + body lit;
+   inactive recedes (smaller + dim + halo invisible).                */
 
 .celestial {
   position: absolute;
-  width: 88px;
-  height: 88px;
   border: 0;
   background: transparent;
   padding: 0;
   cursor: pointer;
   z-index: 5;
-  transition: transform 600ms var(--ease), opacity 600ms var(--ease), filter 600ms var(--ease);
+  /* Long, eased transitions on theme swap so the celestial bodies
+     glide between active/inactive states. */
+  transition:
+    transform 700ms var(--ease),
+    opacity   700ms var(--ease);
 }
 .celestial svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.celestial:hover { transform: scale(1.06); }
-.celestial:active { transform: scale(0.96); }
+.celestial:hover { filter: brightness(1.05); }
 
-/* Sun — top-right quadrant, far from the globe. */
+/* Sun — top-center, large, with a slow gentle pulse on the halos. */
 .celestial-sun {
-  top: max(96px, calc(env(safe-area-inset-top) + 84px));
-  right: -14px;
+  width: 200px;
+  height: 200px;
+  top: max(40px, calc(env(safe-area-inset-top) + 30px));
+  left: 50%;
+  /* The translate is part of the *active* state so we can layer the
+     scale below it cleanly. We re-declare it per state to avoid
+     animation conflicts. */
+  transform: translateX(-50%) scale(1);
+  /* The body sits below the visible top-edge of the screen — only the
+     bottom half of the halo + body show, like a sun coming over the
+     horizon. Margin-top pulls the SVG so its centre is just above
+     the viewport's top edge. */
+  margin-top: -90px;
 }
+/* Halo elements pulse + the rays slowly rotate. */
 .celestial-sun .sun-rays {
-  transform-origin: 50px 50px;
+  transform-origin: 100px 100px;
   transform-box: fill-box;
-  animation: sun-spin 22s linear infinite;
+  animation: sun-spin 30s linear infinite;
 }
-@keyframes sun-spin { to { transform: rotate(360deg); } }
+.celestial-sun .sun-glow-outer { animation: sun-pulse-out 5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.celestial-sun .sun-glow-mid   { animation: sun-pulse-in  3.5s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+@keyframes sun-spin       { to { transform: rotate(360deg); } }
+@keyframes sun-pulse-out  { 0%,100% { opacity: 0.85; transform: scale(1);    } 50% { opacity: 1;    transform: scale(1.04); } }
+@keyframes sun-pulse-in   { 0%,100% { opacity: 0.95; transform: scale(0.98); } 50% { opacity: 1;    transform: scale(1.02); } }
 
-/* Moon — bottom-left, low on the page above the tray. */
+/* Moon — top-right corner, smaller than the sun. Same layout idea. */
 .celestial-moon {
-  bottom: 28%;
-  left: -14px;
-  width: 78px;
-  height: 78px;
-  animation: moon-bob 8s ease-in-out infinite;
+  width: 130px;
+  height: 130px;
+  top: max(50px, calc(env(safe-area-inset-top) + 50px));
+  right: -32px;
+  transform: scale(1);
+  animation: moon-bob 9s ease-in-out infinite;
 }
+.celestial-moon .moon-glow-outer { animation: sun-pulse-out 6s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
 @keyframes moon-bob {
-  0%, 100% { transform: translateY(0) rotate(0); }
-  50%      { transform: translateY(-6px) rotate(2deg); }
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-4px) scale(1); }
 }
 
-/* Active-theme treatment: glow + full opacity. Inactive: dim + smaller. */
-[data-theme="light"] .celestial-sun  { opacity: 1;    filter: drop-shadow(0 0 28px rgba(255,180,80,0.7));  }
-[data-theme="light"] .celestial-moon { opacity: 0.42; filter: none; transform: scale(0.78); }
-[data-theme="dark"]  .celestial-sun  { opacity: 0.42; filter: none; transform: scale(0.78); }
-[data-theme="dark"]  .celestial-moon { opacity: 1;    filter: drop-shadow(0 0 28px rgba(220,220,255,0.45)); }
-/* Hover keeps the scale boost regardless of theme — keep the dim one
-   reachable. */
-[data-theme="light"] .celestial-moon:hover { transform: scale(0.86); }
-[data-theme="dark"]  .celestial-sun:hover  { transform: scale(0.86); }
+/* Active-theme treatment.
+   - LIGHT theme → sun is the boss (big, full opacity, halo glowing);
+     moon recedes (small, very dim, no halo).
+   - DARK theme → mirror.
+   The SVG halo handles the glow itself, no CSS drop-shadow needed. */
+[data-theme="light"] .celestial-sun  { opacity: 1;   transform: translateX(-50%) scale(1);    }
+[data-theme="light"] .celestial-moon { opacity: 0.35; transform: scale(0.65); }
+[data-theme="light"] .celestial-moon .moon-glow-outer { opacity: 0; }
+
+[data-theme="dark"]  .celestial-sun  { opacity: 0.42; transform: translateX(-50%) scale(0.7); }
+[data-theme="dark"]  .celestial-sun  .sun-glow-outer,
+[data-theme="dark"]  .celestial-sun  .sun-glow-mid    { opacity: 0; }
+[data-theme="dark"]  .celestial-moon { opacity: 1;    transform: scale(1); }
+
+/* Inactive body becomes hover-able even when dim. */
+[data-theme="light"] .celestial-moon:hover { transform: scale(0.78); opacity: 0.6; }
+[data-theme="dark"]  .celestial-sun:hover  { transform: translateX(-50%) scale(0.82); opacity: 0.7; }
+
 @media (prefers-reduced-motion: reduce) {
-  .celestial-sun .sun-rays { animation: none; }
-  .celestial-moon { animation: none; }
+  .celestial-sun .sun-rays,
+  .celestial-sun .sun-glow-outer,
+  .celestial-sun .sun-glow-mid,
+  .celestial-moon,
+  .celestial-moon .moon-glow-outer { animation: none; }
 }
 
-/* On bigger screens, push them further into the corners + bigger. */
+/* On bigger screens, give them more breathing room. */
 @media (min-width: 768px) {
-  .celestial-sun  { width: 120px; height: 120px; top: 12vh; right: 4vw; }
-  .celestial-moon { width: 110px; height: 110px; bottom: 18vh; left: 4vw; }
+  .celestial-sun  { width: 280px; height: 280px; margin-top: -120px; }
+  .celestial-moon { width: 180px; height: 180px; right: -40px; top: 6vh; }
 }
 
 /* Vignette darkens the edges so the globe pops in the center. */
