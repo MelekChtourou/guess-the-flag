@@ -933,6 +933,41 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
   font-feature-settings: "tnum";
 }
 
+/* Lobby game tabs — host picks which mini-game the room will play. */
+.lobby-game-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.lobby-game-tab {
+  padding: 10px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  letter-spacing: -0.01em;
+  transition: background 200ms var(--ease), color 200ms var(--ease), border-color 200ms var(--ease);
+}
+.lobby-game-tab.is-active {
+  background: var(--accent);
+  color: #1a1206;
+}
+.lobby-game-tab:not(.is-active):not(:disabled):hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.lobby-game-tab:disabled { cursor: default; }
+/* Non-host players see the tabs as info only, not interactive. */
+.lobby-game-tab:disabled:not(.is-active) { opacity: 0.55; }
+
 .player-list-wrap {
   background: var(--surface);
   border: 1px solid var(--border);

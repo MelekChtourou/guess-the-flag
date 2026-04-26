@@ -212,11 +212,23 @@
           <div class="room-code" id="lobby-code">----</div>
           <button id="lobby-share" class="btn-link">Tap to copy link</button>
         </div>
+
+        <!--
+          Game tabs — visible to all players (so non-hosts see what's
+          coming), but only the host can change them. multiplayer.js
+          disables the buttons for non-hosts.
+        -->
+        <div id="lobby-game-tabs" class="lobby-game-tabs" role="tablist" aria-label="Game">
+          <button class="lobby-game-tab is-active" data-game="flag"       role="tab">🚩 Flags</button>
+          <button class="lobby-game-tab"           data-game="capital"    role="tab">🏛 Capitals</button>
+          <button class="lobby-game-tab"           data-game="population" role="tab">📊 Showdown</button>
+        </div>
+
         <div class="player-list-wrap">
           <div class="player-list-header">Players (<span id="lobby-count">0</span>)</div>
           <ul id="lobby-players" class="player-list"></ul>
         </div>
-        <button id="lobby-start" class="btn btn-primary" hidden>Start game</button>
+        <button id="lobby-start" class="btn btn-primary" hidden>Start: Flags</button>
         <p id="lobby-waiting" class="muted">Waiting for the host to start…</p>
         <button class="btn btn-ghost" data-action="back-to-menu">Leave</button>
       </section>

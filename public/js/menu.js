@@ -106,13 +106,14 @@
       return;
     }
     if (state.mode === "multi") {
-      // Wave 7 will let the host pick the game in the lobby — for now,
-      // creating a multi room implies Flag (the only multi-ready game).
-      if (id !== "flag") {
-        if (window.UI) window.UI.toast("Multiplayer for this game lands next");
-        return;
-      }
-      window.Router.go("/host");
+      // The host's preferred game is queued client-side and sent to the
+      // server with `room:setGame` once we're in the lobby. Letting the
+      // host change it from the lobby tabs still works.
+      if (window.Multiplayer) window.Multiplayer.setGame(id);  // no-op if not yet in room
+      // Stash the desired game type on the multi state so it gets sent
+      // immediately after room creation.
+      if (window.Multiplayer && window.Multiplayer.queueGame) window.Multiplayer.queueGame(id);
+      window.Router.go("/host?game=" + encodeURIComponent(id));
       return;
     }
     if (state.mode === "daily") {

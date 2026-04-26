@@ -7,7 +7,26 @@
 // All scoring / round timing is server-authoritative. Clients tell us
 // "I picked option X"; we decide if it was right and how many points.
 
-const { buildQuestionSet } = require("./questions");
+const {
+  buildQuestionSet,
+  buildCapitalQuestionSet,
+  buildPopulationQuestionSet,
+} = require("./questions");
+
+// Whitelist of game types that rooms can play. Mirrors the client's
+// Games.* registry. Adding a new game = add an id here + a builder.
+const GAME_TYPES = ["flag", "capital", "population"];
+const DEFAULT_GAME_TYPE = "flag";
+
+// Pick the right question builder for a room.
+function buildQuestionsFor(gameType, count) {
+  switch (gameType) {
+    case "capital":    return buildCapitalQuestionSet(count);
+    case "population": return buildPopulationQuestionSet(count);
+    case "flag":
+    default:           return buildQuestionSet(count);
+  }
+}
 
 // --- Constants -------------------------------------------------------
 
@@ -86,11 +105,25 @@ function publicPlayerList(room) {
 
 function emitLobby(io, room) {
   io.to(room.code).emit("lobby:update", {
-    code: room.code,
-    hostId: room.hostId,
-    players: publicPlayerList(room),
-    status: room.status,
+    code:     room.code,
+    hostId:   room.hostId,
+    players:  publicPlayerList(room),
+    status:   room.status,
+    gameType: room.gameType,
   });
+}
+
+// Host-only: change which game the room will play. Lobby-only.
+function setGame(io, socket, gameType) {
+  const code = socketIndex.get(socket.id);
+  if (!code) return;
+  const room = rooms.get(code);
+  if (!room || room.hostId !== socket.id) return;
+  if (room.status !== "waiting") return;
+  if (!GAME_TYPES.includes(gameType)) return;
+  if (room.gameType === gameType) return;
+  room.gameType = gameType;
+  emitLobby(io, room);
 }
 
 // --- Room lifecycle -------------------------------------------------
@@ -103,6 +136,9 @@ function createRoom(socket, name) {
     hostId: socket.id,
     players: new Map(),
     status: "waiting",
+    // Each room holds one game type at a time. Host can change it from
+    // the lobby via 'room:setGame' before the round starts.
+    gameType: DEFAULT_GAME_TYPE,
     round: 0,
     questions: [],
     roundStartedAt: 0,
@@ -192,13 +228,29 @@ function startGame(io, socket) {
   if (room.status !== "waiting") return;
   if (room.players.size < 1) return;
 
-  room.questions = buildQuestionSet(TOTAL_ROUNDS);
+  // Build the right question set for whichever game the host picked.
+  room.questions = buildQuestionsFor(room.gameType, TOTAL_ROUNDS);
   room.round = 0;
   for (const p of room.players.values()) {
     p.score = 0;
     p.streak = 0;
   }
   startRound(io, room);
+}
+
+// What does "answering correctly" look like for each game?
+//   flag/capital  → choice must equal question.correct (the country name)
+//   population    → choice is "a" or "b"; we compare against question.correct
+function isCorrectAnswer(gameType, question, choice) {
+  if (gameType === "population") return choice === question.correct;
+  return choice === question.correct;   // flag/capital share the same shape
+}
+
+// Validate a submitted choice is even one of the offered options
+// (cheap anti-cheat — clients aren't allowed to send arbitrary strings).
+function isValidChoice(gameType, question, choice) {
+  if (gameType === "population") return choice === "a" || choice === "b";
+  return Array.isArray(question.options) && question.options.includes(choice);
 }
 
 function startRound(io, room) {
@@ -210,14 +262,37 @@ function startRound(io, room) {
     p.answerAt = null;
   }
 
-  // Send the question without the correct answer — server is authoritative.
-  io.to(room.code).emit("round:start", {
-    round: room.round + 1,
-    total: room.questions.length,
-    flagCode: question.flagCode,
-    options: question.options,
+  // Build the variant payload per game type. The client's multiplayer.js
+  // dispatches on `gameType` to pick the right renderer.
+  const base = {
+    gameType: room.gameType,
+    round:    room.round + 1,
+    total:    room.questions.length,
     deadline: room.roundStartedAt + ROUND_DURATION_MS,
-  });
+  };
+  let payload;
+  if (room.gameType === "capital") {
+    payload = {
+      ...base,
+      capital:  question.capital,
+      options:  question.options,
+      flagCode: question.flagCode,    // for the reveal panel
+    };
+  } else if (room.gameType === "population") {
+    payload = {
+      ...base,
+      a: { code: question.a.code, name: question.a.name },
+      b: { code: question.b.code, name: question.b.name },
+    };
+  } else {
+    // flag (default)
+    payload = {
+      ...base,
+      flagCode: question.flagCode,
+      options:  question.options,
+    };
+  }
+  io.to(room.code).emit("round:start", payload);
 
   if (room.roundTimer) clearTimeout(room.roundTimer);
   room.roundTimer = setTimeout(() => endRound(io, room), ROUND_DURATION_MS);
@@ -232,8 +307,7 @@ function submitAnswer(io, socket, choice) {
   if (!player || player.lastAnswer != null) return;
 
   const question = room.questions[room.round];
-  // Reject answers that aren't one of the offered options (cheap input check).
-  if (!question.options.includes(choice)) return;
+  if (!isValidChoice(room.gameType, question, choice)) return;
 
   player.lastAnswer = choice;
   player.answerAt = Date.now();
@@ -255,7 +329,7 @@ function endRound(io, room) {
 
   // Score every player based on their recorded answer + timing.
   for (const p of room.players.values()) {
-    if (p.lastAnswer === question.correct) {
+    if (isCorrectAnswer(room.gameType, question, p.lastAnswer)) {
       const elapsed = (p.answerAt || room.roundStartedAt + ROUND_DURATION_MS) - room.roundStartedAt;
       const timeFraction = Math.max(0, 1 - elapsed / ROUND_DURATION_MS);
       const timeBonus = Math.round(POINTS_TIME_MAX * timeFraction);
@@ -267,16 +341,39 @@ function endRound(io, room) {
     }
   }
 
-  io.to(room.code).emit("round:end", {
-    round:     room.round + 1,
-    total:     room.questions.length,
-    correct:   question.correct,
-    flagCode:  question.flagCode,
-    continent: question.continent,
-    fact:      question.fact,
-    scores:    publicPlayerList(room),
-    deadline:  Date.now() + REVEAL_DURATION_MS,
-  });
+  // Variant reveal payload per game.
+  const base = {
+    gameType: room.gameType,
+    round:    room.round + 1,
+    total:    room.questions.length,
+    correct:  question.correct,
+    scores:   publicPlayerList(room),
+    deadline: Date.now() + REVEAL_DURATION_MS,
+  };
+  let payload;
+  if (room.gameType === "capital") {
+    payload = {
+      ...base,
+      flagCode:  question.flagCode,
+      continent: question.continent,
+      fact:      question.fact,
+      capital:   question.capital,
+    };
+  } else if (room.gameType === "population") {
+    payload = {
+      ...base,
+      a: question.a,
+      b: question.b,
+    };
+  } else {
+    payload = {
+      ...base,
+      flagCode:  question.flagCode,
+      continent: question.continent,
+      fact:      question.fact,
+    };
+  }
+  io.to(room.code).emit("round:end", payload);
 
   // Auto-advance after the reveal window so a distracted host can't stall.
   room.roundTimer = setTimeout(() => advanceRound(io, room), REVEAL_DURATION_MS);
@@ -382,6 +479,10 @@ function registerSocketHandlers(io) {
 
     socket.on("room:leave", () => {
       leaveRoom(io, socket);
+    });
+
+    socket.on("room:setGame", ({ gameType } = {}) => {
+      setGame(io, socket, gameType);
     });
 
     socket.on("game:start", () => {

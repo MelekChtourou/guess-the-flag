@@ -123,7 +123,10 @@
       return;
     }
     if (pendingAction === "create-room") {
-      window.Multiplayer.create(nickname);
+      // Pass through the desired game type if the URL carried it
+      // (e.g. /host?game=capital from the menu's Multi-mode tap).
+      const gameType = new URLSearchParams(location.search).get("game");
+      window.Multiplayer.create(nickname, gameType);
     } else if (pendingAction === "join-room") {
       if (code.length !== 4) {
         window.UI.toast("Room code is 4 letters");
