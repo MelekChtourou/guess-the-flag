@@ -177,6 +177,13 @@
       window.Globe.onContinentSelected((id) => setContinent(id));
     }
 
+    // Auto-fade the onboarding hint after a few seconds even if the user
+    // hasn't tapped anywhere yet — keeps the menu uncluttered on long views.
+    setTimeout(() => {
+      const hint = document.getElementById("atlas-hint");
+      if (hint) hint.classList.add("is-faded");
+    }, 8000);
+
     // Initial fill.
     setMode("solo");
     refreshDailyQuick();

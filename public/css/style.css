@@ -420,36 +420,67 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 }
 .atlas-profile-fab:hover { background: var(--surface-hover); }
 
-/* --- Hint text in the middle ------------------------------------- */
+/* --- Onboarding hint pill (glass with a radar pulse) ------------- */
 
 .atlas-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(40% + env(safe-area-inset-bottom, 0px));
+  /* Sit comfortably above the bottom tray, at ~40% of viewport height
+     so it overlaps the equator of the globe. */
+  bottom: calc(38% + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   z-index: 5;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 14px 8px 12px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md);
   font-size: 13px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text);
   pointer-events: none;
-  animation: hint-pulse 3s ease-in-out infinite;
-  opacity: 0.8;
-  transition: opacity 400ms var(--ease);
+  opacity: 0.95;
+  transition: opacity 500ms var(--ease), transform 500ms var(--ease);
+  animation: hint-bob 3.4s ease-in-out infinite;
 }
-.atlas-hint.is-faded { opacity: 0; }
-.atlas-hint-arrow {
-  display: inline-block;
-  font-size: 16px;
-  animation: hint-spin 4s linear infinite;
+.atlas-hint.is-faded {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
 }
-@keyframes hint-spin { to { transform: rotate(360deg); } }
-@keyframes hint-pulse {
+@keyframes hint-bob {
   0%, 100% { transform: translateX(-50%) translateY(0); }
-  50%      { transform: translateX(-50%) translateY(-4px); }
+  50%      { transform: translateX(-50%) translateY(-3px); }
+}
+
+/* Radar-pulse SVG: each concentric ring scales out + fades, staggered. */
+.atlas-hint-ping {
+  flex-shrink: 0;
+  color: var(--accent);
+  overflow: visible;
+}
+.atlas-hint-ping .ping-ring {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: hint-ping 1.8s ease-out infinite;
+  opacity: 0;
+}
+.atlas-hint-ping .ping-ring.r1 { animation-delay: 0s; }
+.atlas-hint-ping .ping-ring.r2 { animation-delay: 0.4s; }
+.atlas-hint-ping .ping-ring.r3 { animation-delay: 0.8s; }
+@keyframes hint-ping {
+  0%   { transform: scale(0.4); opacity: 0; }
+  20%  { opacity: 0.9; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .atlas-hint, .atlas-hint-ping .ping-ring { animation: none; opacity: 1; }
 }
 
 /* --- Continent label --------------------------------------------- */

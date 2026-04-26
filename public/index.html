@@ -81,10 +81,18 @@
           </div>
         </header>
 
-        <!-- Floating hint that fades out on first interaction. -->
-        <div id="atlas-hint" class="atlas-hint">
-          <span class="atlas-hint-arrow" aria-hidden="true">↻</span>
-          <span class="atlas-hint-text">Drag to spin · tap a continent</span>
+        <!--
+          Onboarding hint as a glass pill with an animated radar pulse.
+          Fades on first interaction, auto-fades after a few seconds.
+        -->
+        <div id="atlas-hint" class="atlas-hint" aria-hidden="true">
+          <svg class="atlas-hint-ping" viewBox="0 0 24 24" width="18" height="18">
+            <circle class="ping-ring r1" cx="12" cy="12" r="3"  fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <circle class="ping-ring r2" cx="12" cy="12" r="6"  fill="none" stroke="currentColor" stroke-width="1.2"/>
+            <circle class="ping-ring r3" cx="12" cy="12" r="9"  fill="none" stroke="currentColor" stroke-width="1"/>
+            <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+          </svg>
+          <span class="atlas-hint-text">Tap a region</span>
         </div>
 
         <!-- Continent label: appears once a region is selected. -->
