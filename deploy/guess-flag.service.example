@@ -1,0 +1,32 @@
+# systemd unit for Guess the Flag.
+#
+# Install on your VPS:
+#   sudo cp deploy/guess-flag.service.example /etc/systemd/system/guess-flag.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now guess-flag
+#   sudo systemctl status guess-flag
+#
+# Adjust User=, WorkingDirectory=, and ExecStart= to match where you cloned
+# the repo and which user should own the process.
+
+[Unit]
+Description=Guess the Flag (Node)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/guess-the-flag
+ExecStart=/usr/bin/node server/index.js
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Restart=on-failure
+RestartSec=3
+# Security hardening — sane defaults for a small public-facing Node app.
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

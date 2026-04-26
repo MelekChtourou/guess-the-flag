@@ -1,0 +1,17 @@
+{
+  "name": "guess-the-flag",
+  "version": "1.0.0",
+  "description": "A simple, playful, mobile-friendly flag-guessing party game with solo and multiplayer (room-code) modes.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}

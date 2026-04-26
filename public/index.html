@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0a0d18" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f4f8" media="(prefers-color-scheme: light)" />
+    <title>Guess the Flag</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%A9%3C/text%3E%3C/svg%3E" />
+    <!--
+      Set theme attribute BEFORE stylesheets/body render to avoid a
+      light-flash if the user prefers light mode and we previously
+      stored that choice.
+    -->
+    <script>
+      (function () {
+        var saved = null;
+        try { saved = localStorage.getItem("gtf-theme"); } catch (e) {}
+        var theme =
+          saved === "light" || saved === "dark"
+            ? saved
+            : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <link rel="preconnect" href="https://flagcdn.com" />
+    <link rel="preconnect" href="https://rest.fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <main id="app">
+
+      <!-- Top bar: sound + theme toggles (always visible) -->
+      <div class="topbar">
+        <button id="sound-toggle" class="icon-btn sound-toggle" aria-label="Toggle sound">
+          <span class="icon-on"  aria-hidden="true">♪</span>
+          <span class="icon-off" aria-hidden="true">⌀</span>
+        </button>
+        <button id="theme-toggle" class="icon-btn theme-toggle" aria-label="Toggle theme">
+          <span class="icon-dark" aria-hidden="true">☾</span>
+          <span class="icon-light" aria-hidden="true">☀</span>
+        </button>
+      </div>
+
+      <!-- =========================================================== -->
+      <!-- MENU                                                         -->
+      <!-- =========================================================== -->
+      <section id="screen-menu" class="screen screen-active">
+        <div class="hero">
+          <!--
+            The 3D globe lives here. globe.js boots a Three.js sphere
+            into #globe-canvas; if WebGL or the CDN script fails, it
+            unhides #hero-fallback so the page never looks broken.
+          -->
+          <div id="globe-canvas" class="globe-canvas" aria-hidden="true"></div>
+          <div id="hero-fallback" class="hero-flag" aria-hidden="true" hidden>🚩</div>
+          <h1>Guess the Flag</h1>
+          <p class="tagline">A quick test of your atlas. Solo or with friends.</p>
+        </div>
+
+        <div class="menu-buttons">
+          <button class="menu-card" data-action="solo">
+            <span class="menu-icon">◐</span>
+            <span class="menu-text">
+              <span class="menu-label">Solo</span>
+              <span class="menu-sub">Just you, ten flags, one timer.</span>
+            </span>
+            <span class="menu-arrow">→</span>
+          </button>
+          <button class="menu-card" data-action="create-room">
+            <span class="menu-icon">★</span>
+            <span class="menu-text">
+              <span class="menu-label">Create Room</span>
+              <span class="menu-sub">Host a game, get a 4-letter code.</span>
+            </span>
+            <span class="menu-arrow">→</span>
+          </button>
+          <button class="menu-card" data-action="join-room">
+            <span class="menu-icon">⌗</span>
+            <span class="menu-text">
+              <span class="menu-label">Join Room</span>
+              <span class="menu-sub">Punch in a friend's code.</span>
+            </span>
+            <span class="menu-arrow">→</span>
+          </button>
+        </div>
+
+        <footer class="menu-footer">made for the curious</footer>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- NICKNAME                                                     -->
+      <!-- =========================================================== -->
+      <section id="screen-nickname" class="screen">
+        <button class="back" data-action="back-to-menu" aria-label="Back">‹</button>
+        <h2 id="nickname-title">Pick a nickname</h2>
+        <input id="nickname-input" type="text" maxlength="14" placeholder="e.g. FlagHunter" autocomplete="off" />
+        <div id="nickname-extra" hidden>
+          <input id="join-code-input" type="text" maxlength="4" placeholder="ROOM CODE" autocomplete="off" inputmode="latin" />
+        </div>
+        <button id="nickname-go" class="btn btn-primary">Continue</button>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- LOBBY                                                        -->
+      <!-- =========================================================== -->
+      <section id="screen-lobby" class="screen">
+        <h2>Waiting room</h2>
+        <div class="room-code-box">
+          <div class="room-code-label">Room code</div>
+          <div class="room-code" id="lobby-code">----</div>
+          <button id="lobby-share" class="btn-link">Tap to copy link</button>
+        </div>
+        <div class="player-list-wrap">
+          <div class="player-list-header">Players (<span id="lobby-count">0</span>)</div>
+          <ul id="lobby-players" class="player-list"></ul>
+        </div>
+        <button id="lobby-start" class="btn btn-primary" hidden>Start game</button>
+        <p id="lobby-waiting" class="muted">Waiting for the host to start…</p>
+        <button class="btn btn-ghost" data-action="back-to-menu">Leave</button>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- GAME                                                         -->
+      <!-- =========================================================== -->
+      <section id="screen-game" class="screen">
+        <header class="game-hud">
+          <div class="hud-cell">
+            <span class="hud-label">Round</span>
+            <span class="hud-value"><span id="hud-round">1</span>/<span id="hud-total">10</span></span>
+          </div>
+          <div class="hud-cell">
+            <span class="hud-label">Score</span>
+            <span class="hud-value is-accent" id="hud-score">0</span>
+          </div>
+          <div class="hud-cell">
+            <span class="hud-label">Streak</span>
+            <span class="hud-value" id="hud-streak">0</span>
+          </div>
+        </header>
+
+        <div class="timer-wrap">
+          <div id="timer-bar" class="timer-bar"></div>
+        </div>
+
+        <div class="flag-stage">
+          <img id="flag-img" alt="Flag to guess" />
+        </div>
+
+        <div id="options" class="options"></div>
+
+        <div id="reaction" class="reaction" aria-live="polite"></div>
+
+        <!--
+          The country detail panel is part of the game screen so we can
+          show the answer + facts inline without a screen change. Stays
+          hidden until reveal time.
+        -->
+        <div id="country-panel">
+          <!--
+            Cinematic hero: full-bleed Wikipedia photo with a gradient
+            scrim and the country name + region overlaid. The header
+            (mini-flag + name) below is the always-present, always-cheap
+            fallback used while the photo is loading or unavailable.
+          -->
+          <div class="cp-hero" id="cp-hero" hidden>
+            <img id="cp-hero-img" alt="" />
+            <div class="cp-hero-scrim"></div>
+            <div class="cp-hero-overlay">
+              <div class="cp-hero-name"   id="cp-hero-name">—</div>
+              <div class="cp-hero-region" id="cp-hero-region"></div>
+            </div>
+          </div>
+          <div class="cp-header">
+            <img class="cp-flag" id="cp-flag" alt="" />
+            <div class="cp-title">
+              <div class="cp-name" id="cp-name">—</div>
+              <div class="cp-region" id="cp-region"></div>
+            </div>
+          </div>
+          <div class="cp-stats" id="cp-stats"></div>
+          <div class="cp-fact" id="cp-fact" hidden></div>
+          <div class="cp-intro" id="cp-intro" hidden></div>
+          <div class="cp-actions">
+            <button id="cp-next" class="btn btn-primary">Next →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- ROUND-END (multiplayer)                                      -->
+      <!-- =========================================================== -->
+      <section id="screen-round-end" class="screen">
+        <h2 id="round-end-title">Round 1 results</h2>
+        <p id="round-end-correct" class="round-end-correct"></p>
+        <p id="round-end-fact" class="round-end-fact"></p>
+        <ul id="round-end-scores" class="player-list"></ul>
+        <p class="muted">Next round starts in a moment…</p>
+      </section>
+
+      <!-- =========================================================== -->
+      <!-- RESULTS                                                      -->
+      <!-- =========================================================== -->
+      <section id="screen-results" class="screen">
+        <h2 id="results-tier">Flag Master</h2>
+        <div id="results-score" class="results-score">0 pts</div>
+        <ul id="results-scores" class="player-list" hidden></ul>
+        <div class="results-actions">
+          <button class="btn btn-primary" data-action="play-again">Play again</button>
+          <button class="btn btn-ghost" data-action="back-to-menu">Main menu</button>
+        </div>
+      </section>
+
+    </main>
+
+    <div id="toast"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="/js/sound.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/js/colorExtractor.js"></script>
+    <script src="/js/country.js"></script>
+    <script src="/js/game.js"></script>
+    <script src="/js/solo.js"></script>
+    <script src="/js/multiplayer.js"></script>
+    <script src="/js/app.js"></script>
+    <!-- Globe is a defer-loaded ES module so it never blocks the rest of the page. -->
+    <script src="/js/globe.js" defer></script>
+  </body>
+</html>
