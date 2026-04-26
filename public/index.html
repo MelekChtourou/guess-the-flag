@@ -95,7 +95,25 @@
           <span class="atlas-hint-text">Tap a region</span>
         </div>
 
-        <!-- Continent label: appears once a region is selected. -->
+        <!--
+          Country detail card — appears once a country is tapped on the
+          globe. Shows mini flag + country name + capital + population.
+          The × clears it (zooms the camera back out, removes borders).
+        -->
+        <div id="country-detail-card" class="country-detail-card" hidden>
+          <img class="cdc-flag" id="cdc-flag" alt="" />
+          <div class="cdc-meta">
+            <div class="cdc-name" id="cdc-name">—</div>
+            <div class="cdc-sub"  id="cdc-sub">—</div>
+          </div>
+          <button class="cdc-clear" data-action="clear-country" aria-label="Clear country">×</button>
+        </div>
+
+        <!--
+          Continent label is kept as a hidden fallback (used when the
+          TopoJSON fails to load and we degrade to the old continent-by-
+          centroid behavior). Same data-action so menu.js can clear it.
+        -->
         <div id="continent-label" class="continent-label" hidden>
           <div class="continent-label-eyebrow">Region</div>
           <div class="continent-label-name" id="continent-name">All world</div>
@@ -421,6 +439,8 @@
     <script src="/js/menu.js"></script>
     <script src="/js/router.js"></script>
     <script src="/js/app.js"></script>
+    <!-- TopoJSON parser must load before globe.js so window.TopoJSONMini exists. -->
+    <script src="/js/topojson-mini.js" defer></script>
     <!-- Globe is a defer-loaded ES module so it never blocks the rest of the page. -->
     <script src="/js/globe.js" defer></script>
 

@@ -16,7 +16,11 @@
   const state = {
     mode: "solo",
     continent: null,         // null = worldwide
+    country: null,           // null = no country selected
   };
+
+  // Tiny in-memory cache of /api/country-summary results keyed by code.
+  const countrySummaryCache = new Map();
 
   function $(id) { return document.getElementById(id); }
   function $$(sel) { return [...document.querySelectorAll(sel)]; }
@@ -57,11 +61,87 @@
       name.textContent = id;
     } else {
       label.hidden = true;
-      if (window.Globe) window.Globe.clearSelection();
     }
     // Fade the hint text once the user has interacted.
     const hint = $("atlas-hint");
     if (hint) hint.classList.add("is-faded");
+  }
+
+  // --- Country state -----------------------------------------------
+
+  // Set when the globe reports a country tap (or null when cleared).
+  // We render the country detail card and update state.continent so
+  // the games tray's continent filter follows the picked country's
+  // region without needing a separate user action.
+  async function setCountry(code, name) {
+    state.country = code || null;
+    const card = $("country-detail-card");
+    const contLabel = $("continent-label");
+
+    if (!code) {
+      // Clear path — both the country card and any continent label,
+      // and tell the globe to dezoom.
+      if (card) card.hidden = true;
+      if (contLabel) contLabel.hidden = true;
+      state.continent = null;
+      if (window.Globe) window.Globe.clearSelection();
+      return;
+    }
+
+    // Hide the continent fallback label if it was up.
+    if (contLabel) contLabel.hidden = true;
+
+    // Fade the onboarding hint.
+    const hint = $("atlas-hint");
+    if (hint) hint.classList.add("is-faded");
+
+    // Show whatever we know immediately, then fill from /api/country-summary.
+    const flag = $("cdc-flag");
+    const nameEl = $("cdc-name");
+    const subEl = $("cdc-sub");
+    if (card)   card.hidden = false;
+    if (flag)   flag.src = `https://flagcdn.com/w80/${code}.png`;
+    if (flag)   flag.alt = `Flag of ${name || code}`;
+    if (nameEl) nameEl.textContent = name || code.toUpperCase();
+    if (subEl)  subEl.textContent  = "Loading…";
+
+    let summary = countrySummaryCache.get(code);
+    if (!summary) {
+      try {
+        const res = await fetch(`/api/country-summary/${encodeURIComponent(code)}`);
+        if (res.ok) summary = await res.json();
+      } catch (e) {}
+      if (summary) countrySummaryCache.set(code, summary);
+    }
+
+    // Drop the response if the user has since switched countries.
+    if (state.country !== code) return;
+
+    if (summary) {
+      if (nameEl) nameEl.textContent = summary.name || name || code.toUpperCase();
+      if (subEl)  subEl.textContent  = formatSubtitle(summary);
+      // Auto-derive the continent so the games tray filters to it.
+      state.continent = summary.continent || null;
+    } else {
+      if (subEl) subEl.textContent = "—";
+    }
+  }
+
+  function formatSubtitle(s) {
+    const parts = [];
+    if (s.capital) parts.push(s.capital);
+    if (typeof s.population === "number") {
+      parts.push(formatPop(s.population) + " people");
+    }
+    if (parts.length === 0 && s.continent) parts.push(s.continent);
+    return parts.join(" · ");
+  }
+
+  function formatPop(n) {
+    if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1).replace(/\.0$/, "") + "B";
+    if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (n >= 1_000)         return (n / 1_000).toFixed(0) + "K";
+    return String(n);
   }
 
   // --- Daily quick link refresh ------------------------------------
@@ -162,17 +242,31 @@
       });
     });
 
-    // Continent clear button.
+    // Continent clear button (legacy fallback).
     document.addEventListener("click", (e) => {
       const t = e.target.closest('[data-action="clear-continent"]');
       if (t) {
         e.stopImmediatePropagation();
         if (window.Sound) window.Sound.play("tap");
         setContinent(null);
+        if (window.Globe) window.Globe.clearSelection();
       }
     });
 
-    // Wire globe → continent label.
+    // Country card clear button — same idea but covers the new flow.
+    document.addEventListener("click", (e) => {
+      const t = e.target.closest('[data-action="clear-country"]');
+      if (t) {
+        e.stopImmediatePropagation();
+        if (window.Sound) window.Sound.play("tap");
+        setCountry(null);
+      }
+    });
+
+    // Wire globe → country card (primary path) and continent label (fallback).
+    if (window.Globe && typeof window.Globe.onCountrySelected === "function") {
+      window.Globe.onCountrySelected((code, name) => setCountry(code, name));
+    }
     if (window.Globe && typeof window.Globe.onContinentSelected === "function") {
       window.Globe.onContinentSelected((id) => setContinent(id));
     }
@@ -190,5 +284,5 @@
     refreshProfileBadge();
   });
 
-  window.Menu = { setMode, setContinent, continentFromUrl, refreshDailyQuick, refreshProfileBadge };
+  window.Menu = { setMode, setContinent, setCountry, continentFromUrl, refreshDailyQuick, refreshProfileBadge };
 })();

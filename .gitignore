@@ -5,4 +5,6 @@ npm-debug.log
 .env.*
 *.log
 .claude/
-data/
+# Top-level only — leaves public/data/ (the world-110m.json static asset)
+# committable. The local SQLite DB lives in /data/ via DATA_DIR env var.
+/data/

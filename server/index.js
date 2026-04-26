@@ -23,6 +23,7 @@ const { registerSocketHandlers } = require("./gameManager");
 const { loadDetails } = require("./countryDetails");
 const { COUNTRIES } = require("./countries");
 const Leaderboard = require("./leaderboard");
+const { COUNTRY_DATA } = require("./countryData");
 
 // Quick lookup for code → display name, used by the country-details endpoint.
 const NAME_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c.name]));
@@ -46,6 +47,27 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 // Favicon: browsers ask for /favicon.ico on first load even though we use
 // an inline SVG. Returning 204 stops the noisy 404 in DevTools.
 app.get("/favicon.ico", (req, res) => res.status(204).end());
+
+// Country summary — synchronous, lightweight version of /api/country/:code
+// that reads only from the in-memory dataset (server/countries.js +
+// server/countryData.js). No Wikipedia / REST Countries calls. Used by
+// the globe menu when the user taps a country, where we want instant
+// data, not the full cinematic panel.
+app.get("/api/country-summary/:code", (req, res) => {
+  const code = String(req.params.code || "").toLowerCase();
+  const country = COUNTRIES.find((c) => c.code === code);
+  if (!country) return res.status(404).json({ error: "unknown" });
+  const data = COUNTRY_DATA[code] || {};
+  res.set("Cache-Control", "public, max-age=86400");
+  res.json({
+    code,
+    name:       country.name,
+    continent:  country.continent,
+    fact:       country.fact,
+    capital:    data.capital    || null,
+    population: data.population || null,
+  });
+});
 
 // Country details (capital, population, languages, currencies, intro paragraph,
 // thumbnail photo). Lazily fetched from REST Countries + Wikipedia and cached

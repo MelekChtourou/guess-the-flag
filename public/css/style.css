@@ -277,10 +277,11 @@ body::before {
    ATLAS — full-screen menu (the legendary one)
    ===================================================================== */
 
-/* The fullscreen menu opts out of the standard #app padding so the
-   globe truly fills the viewport edge-to-edge. */
+/* The fullscreen menu opts out of the standard #app max-width by using
+   position: fixed — anchored to the viewport, not the 520px column.
+   That way the globe truly fills the screen on desktop too. */
 .screen-menu-fullscreen.screen-active {
-  position: absolute;
+  position: fixed;
   inset: 0;
   margin: 0;
   padding: 0;
@@ -483,7 +484,77 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
   .atlas-hint, .atlas-hint-ping .ping-ring { animation: none; opacity: 1; }
 }
 
-/* --- Continent label --------------------------------------------- */
+/* --- Country detail card (primary) ------------------------------- */
+
+.country-detail-card[hidden] { display: none !important; }
+.country-detail-card {
+  position: absolute;
+  top: max(120px, calc(env(safe-area-inset-top) + 100px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9;
+  max-width: min(92vw, 480px);
+  width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px 10px 12px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 320ms var(--ease);
+}
+.cdc-flag {
+  width: 40px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.cdc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.cdc-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cdc-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.cdc-clear {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.cdc-clear:hover { color: var(--text); background: var(--surface-hover); }
+
+/* --- Continent label (legacy, fallback only) -------------------- */
 
 .continent-label[hidden] { display: none !important; }
 .continent-label {
@@ -640,6 +711,35 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
   .atlas-tray { padding-left: 24px; padding-right: 24px; }
   .tray-card { min-height: 110px; padding: 16px 8px; }
   .tray-card-icon { font-size: 30px; }
+}
+
+/* Desktop fullscreen — center the tray + brand stays a touch larger.
+   The Three.js renderer already sizes itself to its container; nothing
+   to do for the globe except make sure the stage stretches. */
+@media (min-width: 768px) {
+  .atlas-tray {
+    /* Cap the tray width so it doesn't span a 1920px monitor edge-to-edge. */
+    max-width: 760px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    border-radius: var(--radius) var(--radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .tray-card { min-height: 120px; padding: 20px 10px; }
+  .tray-card-icon { font-size: 34px; }
+  .tray-card-name { font-size: 14px; }
+  .tray-card-sub  { font-size: 11px; }
+  .atlas-brand-name { font-size: 14px; letter-spacing: 5px; }
+  .atlas-brand-mark { width: 22px; height: 22px; }
+  .atlas-profile-fab { font-size: 13px; padding: 9px 16px; }
+  .country-detail-card { padding: 12px 16px 12px 14px; }
+  .cdc-flag { width: 48px; height: 32px; }
+  .cdc-name { font-size: 18px; }
+  .cdc-sub  { font-size: 13px; }
 }
 
 /* =====================================================================

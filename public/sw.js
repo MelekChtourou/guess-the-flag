@@ -11,7 +11,7 @@
 // Bumping CACHE_VERSION evicts the old cache on next activate.
 
 // Bumped when the asset list changes — old cache is purged on activate.
-const CACHE_VERSION = "atlas-v1";
+const CACHE_VERSION = "atlas-v2";
 const ASSET_CACHE   = `${CACHE_VERSION}-assets`;
 const REMOTE_CACHE  = `${CACHE_VERSION}-remote`;
 
@@ -36,7 +36,10 @@ const PRECACHE = [
   "/js/router.js",
   "/js/theme.js",
   "/js/globe.js",
+  "/js/topojson-mini.js",
+  "/js/menu.js",
   "/js/app.js",
+  "/data/world-110m.json",
   "/manifest.json",
   "/icon-192.svg",
   "/icon-512.svg",
