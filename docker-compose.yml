@@ -5,6 +5,9 @@
 #   and reverse-proxies to it. The container is not directly exposed.
 # - PORT=3000 inside the container; published to 3100 on the host (chosen
 #   because that range was free on the VPS at setup time).
+# - /data is a named Docker volume that holds the SQLite leaderboard DB.
+#   It survives container restarts, image upgrades, and `docker-compose
+#   down/up` cycles.
 
 services:
   app:
@@ -16,8 +19,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      DATA_DIR: /data
+    volumes:
+      - guess-flag-data:/data
     healthcheck:
-      # Tiny inline check — no extra tools needed in the image.
       test: ["CMD-SHELL", "wget -qO- --tries=1 --timeout=2 http://localhost:3000/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
@@ -28,3 +33,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  guess-flag-data:

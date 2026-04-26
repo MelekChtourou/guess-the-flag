@@ -1,0 +1,17 @@
+<!-- Maskable icon: art is contained within the inner 80% safe zone so
+     OS-level rounded mask doesn't crop key elements (PWA spec). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="amberGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#f5c77e"/>
+      <stop offset="100%" stop-color="#d99c4a"/>
+    </linearGradient>
+  </defs>
+  <!-- Full-bleed background so masks of any shape look intentional -->
+  <rect width="512" height="512" fill="#0a0d18"/>
+  <circle cx="256" cy="256" r="180" fill="#f5c77e" opacity="0.10"/>
+  <g transform="translate(192 152)">
+    <rect x="0" y="0" width="14" height="208" rx="7" fill="#e9ecf6"/>
+    <path d="M14 12 L160 60 L14 108 Z" fill="url(#amberGlow)"/>
+  </g>
+</svg>

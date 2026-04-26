@@ -71,7 +71,8 @@
       if (window.Profile) {
         window.Profile.recordRound({
           continent: data.continent,
-          correct: state.myPick === data.correct,
+          correct:   state.myPick === data.correct,
+          code:      data.flagCode,
         });
       }
 
@@ -97,6 +98,7 @@
       // Record final score (the one displayed for this player) into profile.
       const myScore = scoreFor(state.selfId);
       if (window.Profile) window.Profile.recordGame({ score: myScore });
+      if (window.Achievements) window.Achievements.evaluate();
       showResults(data);
     });
 

@@ -1,14 +1,15 @@
 // Daily challenge controller.
 //
 // Re-uses the solo game UI (Game.renderRound + reveal panel + scoring)
-// but pulls its question set from /api/daily-questions and persists the
-// per-round outcome in localStorage so the player can't replay today.
+// but pulls its question set from /api/daily-questions and persists
+// per-round state in localStorage so:
+//   - the player can't replay today after finishing
+//   - if they refresh mid-game, they resume from the next unanswered round
+//     (no longer lose their single attempt)
 //
-// Three states are surfaced to the menu card:
-//   - idle:      not played today  → "Play"
-//   - inProgress: started but not finished (we just resume from the start;
-//                no real per-round resume since the daily is short)
-//   - done:      already played today  → result + share button
+// After finishing, the score is submitted to the global leaderboard
+// (POST /api/daily-result) and the response is rendered: rank, total
+// players, score distribution, top 5.
 
 (function () {
   const STORAGE_KEY = "gtf-daily";
@@ -28,6 +29,7 @@
     results: [],     // "correct" | "wrong" | "timeout" per round
     dayNumber: null,
     date: null,
+    startedAt: 0,    // for total duration → leaderboard anti-cheat sanity
     roundStartedAt: 0,
     timeoutHandle: null,
   };
@@ -46,6 +48,7 @@
     state.results = [];
     state.dayNumber = null;
     state.date = null;
+    state.startedAt = 0;
   }
 
   // --- Local persistence -------------------------------------------
@@ -57,14 +60,42 @@
     } catch (e) { return null; }
   }
 
-  function storeFinal(payload) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (e) {}
+  function storeProgress() {
+    // Snapshot just enough to resume on refresh. Updated every round.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        dayNumber: state.dayNumber,
+        date:      state.date,
+        results:   state.results,
+        score:     state.score,
+        streak:    state.streak,
+        longestStreak: state.longestStreak,
+        index:     state.index,
+        startedAt: state.startedAt,
+        completed: false,
+        at:        Date.now(),
+      }));
+    } catch (e) {}
+  }
+
+  function storeFinal(extra = {}) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        dayNumber: state.dayNumber,
+        date:      state.date,
+        results:   state.results,
+        score:     state.score,
+        longestStreak: state.longestStreak,
+        startedAt: state.startedAt,
+        completed: true,
+        at:        Date.now(),
+        ...extra,
+      }));
+    } catch (e) {}
   }
 
   // --- Menu card rendering -----------------------------------------
 
-  // Update the daily card in the main menu — called on app load and after
-  // the user finishes a daily.
   async function refreshMenuCard() {
     const card = document.getElementById("menu-daily");
     if (!card) return;
@@ -73,7 +104,7 @@
 
     let info;
     try {
-      info = await fetchInfo();   // { dayNumber, date }
+      info = await fetchInfo();
     } catch (e) {
       sub.textContent = "Today's challenge — couldn't load";
       return;
@@ -87,6 +118,10 @@
       sub.textContent = `Daily #${info.dayNumber} — done · ${correctCount}/${stored.results.length}`;
       right.textContent = "✓";
       card.dataset.state = "done";
+    } else if (stored && stored.dayNumber === info.dayNumber && stored.results && stored.results.length > 0) {
+      sub.textContent = `Daily #${info.dayNumber} — resume · ${stored.results.length}/10`;
+      right.textContent = "↻";
+      card.dataset.state = "in-progress";
     } else {
       sub.textContent = `Daily #${info.dayNumber} — same flags for everyone today`;
       right.textContent = "→";
@@ -97,19 +132,9 @@
   // --- API ---------------------------------------------------------
 
   async function fetchInfo() {
-    // Tiny endpoint hit just to learn the day number; results aren't
-    // exposed to the client until they actually start playing (so they
-    // can't peek at answers).
     const res = await fetch("/api/daily-questions");
     if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.json();   // { dayNumber, date, questions }
-  }
-
-  async function fetchQuestions() {
-    const data = await fetchInfo();
-    state.dayNumber = data.dayNumber;
-    state.date = data.date;
-    return data.questions;
+    return await res.json();
   }
 
   // --- Game flow ---------------------------------------------------
@@ -117,24 +142,22 @@
   async function start() {
     reset();
 
-    // Hard-block if the user already finished today's daily.
     let info;
     try { info = await fetchInfo(); } catch (e) {
       if (window.UI) window.UI.toast("Couldn't load today's challenge");
-      window.App.show("menu");
+      window.Router.go("/");
       return;
     }
 
     const stored = loadStored();
+    // Already finished today → jump straight to results.
     if (stored && stored.dayNumber === info.dayNumber && stored.completed) {
-      // Jump to results with the existing data.
-      showResults({
-        score:    stored.score,
-        results:  stored.results,
-        streak:   stored.longestStreak || 0,
-        dayNumber: info.dayNumber,
-        replay:   true,
-      });
+      state.dayNumber = info.dayNumber;
+      state.date = info.date;
+      state.results = stored.results;
+      state.score = stored.score;
+      state.longestStreak = stored.longestStreak || 0;
+      showResults({ replay: true });
       return;
     }
 
@@ -142,12 +165,25 @@
     state.dayNumber = info.dayNumber;
     state.date = info.date;
 
+    // Resume from a partial save if it matches today's day.
+    if (stored && stored.dayNumber === info.dayNumber && stored.results && stored.results.length > 0 && !stored.completed) {
+      state.results       = stored.results.slice();
+      state.score         = stored.score || 0;
+      state.streak        = stored.streak || 0;
+      state.longestStreak = stored.longestStreak || 0;
+      state.index         = state.results.length;
+      state.startedAt     = stored.startedAt || Date.now();
+      if (window.UI) window.UI.toast(`Resumed at round ${state.index + 1}`);
+    } else {
+      state.startedAt = Date.now();
+    }
+
     window.App.show("game");
     window.Game.updateHud({
-      round: 1,
+      round: state.index + 1,
       total: state.questions.length,
-      score: 0,
-      streak: 0,
+      score: state.score,
+      streak: state.streak,
     });
     window.Game.onNextClick(() => {
       state.index += 1;
@@ -193,7 +229,12 @@
       state.results.push("wrong");
     }
 
-    if (window.Profile) window.Profile.recordRound({ continent: q.continent, correct });
+    if (window.Profile) {
+      window.Profile.recordRound({ continent: q.continent, correct, code: q.flagCode });
+    }
+
+    // Persist progress so a refresh resumes from here.
+    storeProgress();
 
     window.Game.updateHud({ score: state.score, streak: state.streak });
 
@@ -203,70 +244,81 @@
     });
   }
 
-  function finish() {
+  async function finish() {
     clearTimers();
 
-    // Persist + bump global profile.
-    storeFinal({
-      dayNumber: state.dayNumber,
-      date:      state.date,
-      results:   state.results,
-      score:     state.score,
-      longestStreak: state.longestStreak,
-      completed: true,
-      at:        Date.now(),
-    });
+    // Persist locally first — we never want to depend on the network
+    // for the daily lock-out.
+    const durationMs = state.startedAt ? (Date.now() - state.startedAt) : 0;
+    storeFinal({ durationMs });
+
     if (window.Profile) {
-      window.Profile.recordGame({ score: state.score, longestStreakInGame: state.longestStreak });
+      window.Profile.recordGame({
+        score: state.score,
+        longestStreakInGame: state.longestStreak,
+      });
       window.Profile.recordDailyComplete({
         dayNumber: state.dayNumber,
         score: state.score,
         correct: state.results.filter((r) => r === "correct").length,
       });
     }
+    if (window.Achievements) window.Achievements.evaluate({ trigger: "daily-finish" });
 
-    showResults({
-      score:    state.score,
-      results:  state.results,
-      streak:   state.longestStreak,
-      dayNumber: state.dayNumber,
-      replay:   false,
-    });
+    showResults({ replay: false });
     refreshMenuCard();
-  }
 
-  function showResults({ score, results, streak, dayNumber, replay }) {
-    const tier = window.UI.tierForScore(score);
-    document.getElementById("results-tier").textContent = replay
-      ? `Daily #${dayNumber} — done`
-      : tier.label;
-    document.getElementById("results-score").textContent = `${score} pts`;
-    document.getElementById("results-scores").hidden = true;
-
-    // Render the share card section.
-    renderShareCard({ mode: "daily", day: dayNumber, results, score, streak });
-
-    window.App.show("results");
-    if (!replay && score >= 700) {
-      window.UI.victoryBurst();
-      if (window.Sound) window.Sound.play("victory");
+    // Submit to global leaderboard (best-effort) and render the panel.
+    if (window.Leaderboard) {
+      window.Leaderboard.submitAndShow({
+        dayNumber:  state.dayNumber,
+        score:      state.score,
+        correct:    state.results.filter((r) => r === "correct").length,
+        durationMs,
+      });
     }
   }
 
-  function renderShareCard(opts) {
+  function showResults({ replay }) {
+    const tier = window.UI.tierForScore(state.score);
+    document.getElementById("results-tier").textContent = replay
+      ? `Daily #${state.dayNumber} — done`
+      : tier.label;
+    document.getElementById("results-score").textContent = `${state.score} pts`;
+    document.getElementById("results-scores").hidden = true;
+
+    renderShareCard();
+
+    window.App.show("results");
+    if (!replay && state.score >= 700) {
+      window.UI.victoryBurst();
+      if (window.Sound) window.Sound.play("victory");
+    }
+
+    // For replays, re-show the leaderboard with last-known data (no resubmit).
+    if (replay && window.Leaderboard) {
+      window.Leaderboard.showLast(state.dayNumber);
+    }
+  }
+
+  function renderShareCard() {
     const wrap = document.getElementById("share-card");
     if (!wrap) return;
-    const text = window.Share.format(opts);
     wrap.hidden = false;
-    wrap.querySelector(".share-grid").textContent = opts.results
+    wrap.querySelector(".share-grid").textContent = state.results
       .map((r) => ({ correct: "🟩", wrong: "🟥", timeout: "⬛" }[r] || "🟥"))
       .join("");
-    wrap.querySelector(".share-summary").textContent = (() => {
-      const correctCount = opts.results.filter((r) => r === "correct").length;
-      return `Daily #${opts.day} · ${correctCount}/${opts.results.length} · ${opts.score} pts`;
-    })();
-    const shareBtn = wrap.querySelector(".share-btn");
-    shareBtn.onclick = () => window.Share.share(text, "Guess the Flag");
+    const correctCount = state.results.filter((r) => r === "correct").length;
+    wrap.querySelector(".share-summary").textContent =
+      `Daily #${state.dayNumber} · ${correctCount}/${state.results.length} · ${state.score} pts`;
+    wrap.querySelector(".share-btn").onclick = () =>
+      window.Share.share(window.Share.format({
+        mode:    "daily",
+        day:     state.dayNumber,
+        results: state.results,
+        score:   state.score,
+        streak:  state.longestStreak,
+      }), "Guess the Flag");
   }
 
   function leave() { clearTimers(); }

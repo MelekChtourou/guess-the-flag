@@ -111,7 +111,13 @@
       state.results.push("wrong");
     }
 
-    if (window.Profile) window.Profile.recordRound({ continent: question.continent, correct });
+    if (window.Profile) {
+      window.Profile.recordRound({
+        continent: question.continent,
+        correct,
+        code: question.flagCode,
+      });
+    }
 
     window.Game.updateHud({ score: state.score, streak: state.streak });
 
@@ -136,6 +142,7 @@
         longestStreakInGame: state.longestStreak,
       });
     }
+    if (window.Achievements) window.Achievements.evaluate();
     renderShareCard();
 
     window.App.show("results");

@@ -65,6 +65,32 @@
       `;
       wrap.appendChild(row);
     });
+
+    // Collection counter (unique flags seen / total in dataset).
+    const seenCount = window.Profile.seenCount();
+    const total = window.Achievements ? window.Achievements.TOTAL_COUNTRIES : 150;
+    document.getElementById("stats-seen-count").textContent = `${seenCount} / ${total}`;
+    document.getElementById("stats-seen-bar").style.width = `${Math.min(100, (seenCount / total) * 100)}%`;
+
+    // Achievements grid — locked vs unlocked, locked are dimmed.
+    const ach = window.Achievements ? window.Achievements.list() : [];
+    const unlockedCount = ach.filter((a) => p.achievements[a.id]).length;
+    document.getElementById("stats-ach-count").textContent = `${unlockedCount} / ${ach.length}`;
+    const aw = document.getElementById("stats-achievements");
+    aw.innerHTML = "";
+    ach.forEach((a) => {
+      const unlocked = !!p.achievements[a.id];
+      const tile = document.createElement("div");
+      tile.className = "stats-ach" + (unlocked ? "" : " is-locked");
+      tile.innerHTML = `
+        <div class="stats-ach-icon">${a.icon}</div>
+        <div class="stats-ach-meta">
+          <div class="stats-ach-title">${a.title}</div>
+          <div class="stats-ach-desc">${a.desc}</div>
+        </div>
+      `;
+      aw.appendChild(tile);
+    });
   }
 
   // --- Nickname screen modes (used for /host and /join) -------------

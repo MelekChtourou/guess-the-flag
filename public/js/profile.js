@@ -18,27 +18,47 @@
     longestStreak: 0,
     xp: 0,
     perContinent: {},
+    seenCodes: {},             // { fr: true, jp: true, ... } — for "X / 195"
+    achievements: {},          // { id: { unlockedAt } }
     daily: {
       currentStreak: 0,
       bestStreak: 0,
-      lastDay: null,         // most recent dayNumber that was completed
-      completed: {},         // { 117: { score, correct }, 116: {...} }
+      lastDay: null,
+      completed: {},
     },
+    // Stable, anonymous identifier used by the global daily leaderboard.
+    // Generated once on first read; never sent anywhere except /api/daily-result.
+    playerId: null,
   });
 
   function read() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return DEFAULT();
+      if (!raw) return ensurePlayerId(DEFAULT());
       const parsed = JSON.parse(raw);
       // Defensive merge in case we add fields later.
-      return Object.assign(DEFAULT(), parsed, {
+      const merged = Object.assign(DEFAULT(), parsed, {
         perContinent: Object.assign({}, parsed.perContinent || {}),
+        seenCodes:    Object.assign({}, parsed.seenCodes    || {}),
+        achievements: Object.assign({}, parsed.achievements || {}),
         daily: Object.assign(DEFAULT().daily, parsed.daily || {}),
       });
+      return ensurePlayerId(merged);
     } catch (e) {
-      return DEFAULT();
+      return ensurePlayerId(DEFAULT());
     }
+  }
+
+  // Generate a stable random id once; persist immediately so subsequent
+  // reads return the same one. Used as the leaderboard primary key.
+  function ensurePlayerId(profile) {
+    if (profile.playerId) return profile;
+    const rand = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : "p_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    profile.playerId = rand;
+    write(profile);
+    return profile;
   }
 
   function write(data) {
@@ -57,12 +77,26 @@
     if (correct) c.correct += 1;
   }
 
-  function recordRound({ continent, correct }) {
+  function recordRound({ continent, correct, code }) {
     const p = read();
     p.totalRounds += 1;
     if (correct) p.totalCorrect += 1;
     bumpContinent(p, continent, correct);
+    if (code) p.seenCodes[code] = true;
     write(p);
+  }
+
+  function unlockAchievement(id) {
+    const p = read();
+    if (p.achievements[id]) return false;
+    p.achievements[id] = { unlockedAt: Date.now() };
+    write(p);
+    return true;
+  }
+
+  function seenCount() {
+    const p = read();
+    return Object.keys(p.seenCodes).length;
   }
 
   function recordGame({ score, longestStreakInGame = 0 }) {
@@ -130,5 +164,7 @@
     summary,
     level,
     reset,
+    unlockAchievement,
+    seenCount,
   };
 })();

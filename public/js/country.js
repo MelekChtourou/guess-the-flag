@@ -55,9 +55,12 @@
   function renderPhoto(details) {
     const wrap = $("cp-hero");
     const img = $("cp-hero-img");
-    // Prefer the full-resolution Wikipedia image; fall back to the
-    // smaller thumbnail; if neither, hide the hero entirely.
-    const src = details.photoFull || details.photo;
+    // Prefer the full-resolution Wikipedia image, but only if it's
+    // moderately-sized — some originals are 5+ MB and a real pain on 4G.
+    // Above ~1500px width we fall back to the small thumbnail.
+    const fullIsReasonable = details.photoFull
+      && (!details.photoFullW || details.photoFullW <= 1500);
+    const src = (fullIsReasonable ? details.photoFull : null) || details.photo;
     if (src) {
       // Cross-fade: clear → set → wait for load → fade in.
       img.style.opacity = "0";

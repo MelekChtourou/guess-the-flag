@@ -15,6 +15,7 @@ const { buildQuestionSet, buildDailyQuestionSet, dailyDateString, dailyDayNumber
 const { registerSocketHandlers } = require("./gameManager");
 const { loadDetails } = require("./countryDetails");
 const { COUNTRIES } = require("./countries");
+const Leaderboard = require("./leaderboard");
 
 // Quick lookup for code → display name, used by the country-details endpoint.
 const NAME_BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c.name]));
@@ -29,8 +30,15 @@ const io = new SocketServer(server, {
   cors: { origin: "*" },
 });
 
+// JSON parsing for the leaderboard submit endpoint.
+app.use(express.json({ limit: "8kb" }));
+
 // Static frontend.
 app.use(express.static(path.join(__dirname, "..", "public")));
+
+// Favicon: browsers ask for /favicon.ico on first load even though we use
+// an inline SVG. Returning 204 stops the noisy 404 in DevTools.
+app.get("/favicon.ico", (req, res) => res.status(204).end());
 
 // Country details (capital, population, languages, currencies, intro paragraph,
 // thumbnail photo). Lazily fetched from REST Countries + Wikipedia and cached
@@ -70,6 +78,31 @@ app.get("/api/daily-questions", (req, res) => {
     dayNumber,
     questions: buildDailyQuestionSet(date, 10),
   });
+});
+
+// Submit a daily-challenge result. Server validates the day matches
+// today and that the score is physically plausible (cheap anti-cheat).
+app.post("/api/daily-result", (req, res) => {
+  const { dayNumber, playerId, playerName, score, correct, durationMs } = req.body || {};
+  const today = dailyDayNumber(new Date());
+  // Allow only "today" submissions. Yesterday's daily is locked once UTC rolls.
+  if (dayNumber !== today) return res.status(400).json({ error: "wrong day" });
+  try {
+    Leaderboard.submit({ day: dayNumber, playerId, playerName, score, correct, durationMs });
+  } catch (e) {
+    return res.status(400).json({ error: e.message || "invalid" });
+  }
+  res.json(Leaderboard.snapshot(dayNumber, playerId));
+});
+
+// Read-only leaderboard snapshot for the current day (or a specific
+// past day via ?day=N — useful for replays of the locked-out daily).
+app.get("/api/daily-leaderboard", (req, res) => {
+  const requested = parseInt(req.query.day, 10);
+  const day = Number.isFinite(requested) ? requested : dailyDayNumber(new Date());
+  const playerId = typeof req.query.playerId === "string" ? req.query.playerId : null;
+  res.set("Cache-Control", "no-store");
+  res.json(Leaderboard.snapshot(day, playerId));
 });
 
 // SPA catchall — any unmatched GET that isn't an API call or static

@@ -325,12 +325,44 @@ function finishGame(io, room) {
 
 // --- Socket wiring --------------------------------------------------
 
+// Lightweight per-IP rate limiter for room:create. Anyone can spam
+// room creation otherwise and grow our in-memory map indefinitely.
+// 5 creates per minute per IP is generous for legit use.
+const createBuckets = new Map();   // ip -> [timestamps...]
+const CREATE_LIMIT = 5;
+const CREATE_WINDOW_MS = 60_000;
+
+function ipFromSocket(socket) {
+  // socket.handshake.address is the remote IP. Behind nginx/Caddy with the
+  // X-Forwarded-For header set, headers carry the real client IP.
+  const fwd = socket.handshake.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd.length > 0) return fwd.split(",")[0].trim();
+  return socket.handshake.address || "?";
+}
+
+function rateLimitedCreate(socket) {
+  const ip = ipFromSocket(socket);
+  const now = Date.now();
+  const bucket = (createBuckets.get(ip) || []).filter((t) => now - t < CREATE_WINDOW_MS);
+  if (bucket.length >= CREATE_LIMIT) {
+    createBuckets.set(ip, bucket);
+    return false;
+  }
+  bucket.push(now);
+  createBuckets.set(ip, bucket);
+  return true;
+}
+
 function registerSocketHandlers(io) {
   io.on("connection", (socket) => {
 
     socket.on("room:create", ({ name } = {}, ack) => {
       if (socketIndex.has(socket.id)) {
         if (typeof ack === "function") ack({ error: "Already in a room" });
+        return;
+      }
+      if (!rateLimitedCreate(socket)) {
+        if (typeof ack === "function") ack({ error: "Too many rooms created — try again in a minute" });
         return;
       }
       const room = createRoom(socket, name);

@@ -6,7 +6,13 @@
     <meta name="theme-color" content="#0a0d18" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#f3f4f8" media="(prefers-color-scheme: light)" />
     <title>Guess the Flag</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='52' font-size='52'%3E%F0%9F%9A%A9%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" type="image/svg+xml" href="/icon-192.svg" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Guess Flag" />
+    <meta name="description" content="A premium flag-guessing party game. Solo, daily challenge, or multiplayer with a 4-letter room code." />
     <!--
       Set theme attribute BEFORE stylesheets/body render to avoid a
       light-flash if the user prefers light mode and we previously
@@ -137,9 +143,25 @@
           </div>
         </div>
 
+        <!-- Countries-collected counter (passport-style aggregate) -->
+        <div class="stats-section-title">Collection</div>
+        <div class="stats-collection">
+          <div class="stats-collection-row">
+            <span class="stats-collection-label">Flags seen</span>
+            <span class="stats-collection-value" id="stats-seen-count">0 / 0</span>
+          </div>
+          <div class="stats-collection-bar">
+            <div id="stats-seen-bar" class="stats-collection-bar-fill"></div>
+          </div>
+        </div>
+
         <!-- Per-continent grid -->
         <div class="stats-section-title">By continent</div>
         <div id="stats-continents" class="stats-continents"></div>
+
+        <!-- Achievements -->
+        <div class="stats-section-title">Achievements <span id="stats-ach-count" class="stats-ach-count"></span></div>
+        <div id="stats-achievements" class="stats-achievements"></div>
       </section>
 
       <!-- =========================================================== -->
@@ -271,6 +293,13 @@
           <button class="btn btn-secondary share-btn">Share result</button>
         </div>
 
+        <!--
+          Daily leaderboard panel — populated by leaderboard.js once the
+          server has accepted the score. Stays hidden if the network
+          submission fails (best-effort feature).
+        -->
+        <div id="leaderboard" class="leaderboard" hidden></div>
+
         <ul id="results-scores" class="player-list" hidden></ul>
         <div class="results-actions">
           <button class="btn btn-primary" data-action="play-again">Play again</button>
@@ -287,7 +316,9 @@
     <script src="/js/sound.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/profile.js"></script>
+    <script src="/js/achievements.js"></script>
     <script src="/js/share.js"></script>
+    <script src="/js/leaderboard.js"></script>
     <script src="/js/colorExtractor.js"></script>
     <script src="/js/country.js"></script>
     <script src="/js/game.js"></script>
@@ -298,5 +329,15 @@
     <script src="/js/app.js"></script>
     <!-- Globe is a defer-loaded ES module so it never blocks the rest of the page. -->
     <script src="/js/globe.js" defer></script>
+
+    <!-- Register the service worker. PWA install + offline shell + faster
+         repeat loads. We register quietly; failures don't break anything. -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("/sw.js").catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
