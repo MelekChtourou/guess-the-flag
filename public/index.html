@@ -38,15 +38,11 @@
   <body>
     <main id="app">
 
-      <!-- Top bar: sound + theme toggles (always visible) -->
+      <!-- Top bar: sound toggle (theme moved to celestial sun/moon). -->
       <div class="topbar">
         <button id="sound-toggle" class="icon-btn sound-toggle" aria-label="Toggle sound">
           <span class="icon-on"  aria-hidden="true">♪</span>
           <span class="icon-off" aria-hidden="true">⌀</span>
-        </button>
-        <button id="theme-toggle" class="icon-btn theme-toggle" aria-label="Toggle theme">
-          <span class="icon-dark" aria-hidden="true">☾</span>
-          <span class="icon-light" aria-hidden="true">☀</span>
         </button>
       </div>
 
@@ -68,6 +64,59 @@
             <div class="star-layer star-near" id="stars-near"></div>
             <div class="star-layer star-far"  id="stars-far"></div>
           </div>
+
+          <!--
+            Sun + Moon = the theme toggles. They live in the background
+            far from the globe (top corners), are always visible, and
+            always swap places animation-wise when you tap one. The
+            currently-active theme's body glows and pulls forward.
+            Click a celestial body → setTheme + visual swap.
+          -->
+          <button id="celestial-sun" class="celestial celestial-sun" aria-label="Light theme">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <defs>
+                <radialGradient id="sun-grad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%"  stop-color="#fff5d6"/>
+                  <stop offset="50%" stop-color="#ffd76e"/>
+                  <stop offset="100%" stop-color="#ff9c3a"/>
+                </radialGradient>
+              </defs>
+              <g class="sun-rays">
+                <g class="ray-group">
+                  <rect x="48" y="2"  width="4" height="14" rx="2" fill="#ffd76e"/>
+                  <rect x="48" y="84" width="4" height="14" rx="2" fill="#ffd76e"/>
+                  <rect x="2"  y="48" width="14" height="4" rx="2" fill="#ffd76e"/>
+                  <rect x="84" y="48" width="14" height="4" rx="2" fill="#ffd76e"/>
+                </g>
+                <g class="ray-group" transform="rotate(45 50 50)">
+                  <rect x="48" y="6"  width="4" height="10" rx="2" fill="#ffd76e" opacity="0.85"/>
+                  <rect x="48" y="84" width="4" height="10" rx="2" fill="#ffd76e" opacity="0.85"/>
+                  <rect x="6"  y="48" width="10" height="4" rx="2" fill="#ffd76e" opacity="0.85"/>
+                  <rect x="84" y="48" width="10" height="4" rx="2" fill="#ffd76e" opacity="0.85"/>
+                </g>
+              </g>
+              <circle cx="50" cy="50" r="22" fill="url(#sun-grad)"/>
+            </svg>
+          </button>
+
+          <button id="celestial-moon" class="celestial celestial-moon" aria-label="Dark theme">
+            <svg viewBox="0 0 100 100" aria-hidden="true">
+              <defs>
+                <radialGradient id="moon-grad" cx="40%" cy="40%" r="60%">
+                  <stop offset="0%"  stop-color="#f4f1e6"/>
+                  <stop offset="60%" stop-color="#cfc9b6"/>
+                  <stop offset="100%" stop-color="#888470"/>
+                </radialGradient>
+              </defs>
+              <circle cx="50" cy="50" r="30" fill="url(#moon-grad)"/>
+              <!-- Soft craters -->
+              <circle cx="40" cy="38" r="4"   fill="#9c987f" opacity="0.45"/>
+              <circle cx="58" cy="48" r="3"   fill="#9c987f" opacity="0.4"/>
+              <circle cx="46" cy="60" r="2.5" fill="#9c987f" opacity="0.35"/>
+              <circle cx="62" cy="62" r="1.8" fill="#9c987f" opacity="0.4"/>
+            </svg>
+          </button>
+
           <div class="atlas-vignette" aria-hidden="true"></div>
         </div>
 
@@ -76,11 +125,6 @@
           <div class="atlas-brand">
             <span class="atlas-brand-mark" aria-hidden="true">◯</span>
             <span class="atlas-brand-name">ATLAS</span>
-          </div>
-          <div id="atlas-mode-chips" class="mode-chips" role="tablist" aria-label="Game mode">
-            <button class="mode-chip is-active" data-mode="solo"  role="tab" aria-selected="true">Solo</button>
-            <button class="mode-chip"           data-mode="multi" role="tab" aria-selected="false">Multi</button>
-            <button class="mode-chip"           data-mode="daily" role="tab" aria-selected="false">Daily</button>
           </div>
         </header>
 
@@ -128,24 +172,58 @@
           <div class="tray-handle" aria-hidden="true"></div>
           <div class="tray-games">
             <button class="tray-card" data-action="game" data-game="flag">
-              <span class="tray-card-icon">🚩</span>
+              <span class="tray-card-icon">
+                <svg viewBox="0 0 48 48" aria-hidden="true">
+                  <!-- Stylized waving flag -->
+                  <rect x="9"  y="6"  width="3" height="36" rx="1.5" fill="currentColor"/>
+                  <path d="M12 7 Q22 11 32 8 Q40 6 42 9 L42 22 Q40 25 32 23 Q22 20 12 24 Z"
+                        fill="currentColor" opacity="0.85"/>
+                  <circle cx="33" cy="15.5" r="2.4" fill="var(--bg-base)"/>
+                </svg>
+              </span>
               <span class="tray-card-name">Flags</span>
-              <span class="tray-card-sub">Identify the flag</span>
+              <span class="tray-card-sub">Spot the flag</span>
             </button>
             <button class="tray-card" data-action="game" data-game="capital">
-              <span class="tray-card-icon">🏛</span>
+              <span class="tray-card-icon">
+                <svg viewBox="0 0 48 48" aria-hidden="true">
+                  <!-- Skyline silhouette -->
+                  <rect x="6"  y="22" width="8"  height="20" rx="1" fill="currentColor" opacity="0.7"/>
+                  <rect x="16" y="14" width="9"  height="28" rx="1" fill="currentColor"/>
+                  <polygon points="20.5,8 17,14 24,14" fill="currentColor"/>
+                  <rect x="27" y="20" width="7"  height="22" rx="1" fill="currentColor" opacity="0.85"/>
+                  <rect x="36" y="26" width="6"  height="16" rx="1" fill="currentColor" opacity="0.7"/>
+                  <!-- Tiny windows -->
+                  <rect x="18" y="18" width="2" height="2" fill="var(--bg-base)"/>
+                  <rect x="22" y="18" width="2" height="2" fill="var(--bg-base)"/>
+                  <rect x="18" y="24" width="2" height="2" fill="var(--bg-base)"/>
+                  <rect x="22" y="24" width="2" height="2" fill="var(--bg-base)"/>
+                </svg>
+              </span>
               <span class="tray-card-name">Capitals</span>
-              <span class="tray-card-sub">From a city to a country</span>
+              <span class="tray-card-sub">City → country</span>
             </button>
             <button class="tray-card" data-action="game" data-game="population">
-              <span class="tray-card-icon">📊</span>
+              <span class="tray-card-icon">
+                <svg viewBox="0 0 48 48" aria-hidden="true">
+                  <!-- Two bars + VS divider -->
+                  <rect x="6"  y="20" width="14" height="22" rx="2" fill="currentColor" opacity="0.7"/>
+                  <rect x="28" y="10" width="14" height="32" rx="2" fill="currentColor"/>
+                  <text x="24" y="28" text-anchor="middle" font-size="9" font-weight="800"
+                        fill="currentColor" font-family="-apple-system, system-ui">VS</text>
+                </svg>
+              </span>
               <span class="tray-card-name">Showdown</span>
-              <span class="tray-card-sub">A vs B — bigger?</span>
+              <span class="tray-card-sub">Pick the bigger</span>
             </button>
           </div>
 
-          <!-- Multi-only actions (revealed when Multi chip is active). -->
-          <div id="tray-multi-actions" class="tray-multi-actions" hidden>
+          <!--
+            "Join with code" is the entry point for joining a friend's
+            existing room. Creating a room is now per-game (via the
+            tutorial modal), so this is the only top-level multi action.
+          -->
+          <div class="tray-multi-actions">
             <button class="btn btn-secondary tray-action" data-action="join-room">Join with code</button>
           </div>
 
@@ -174,6 +252,49 @@
           </svg>
         </button>
       </section>
+
+      <!-- =========================================================== -->
+      <!-- GAME TUTORIAL MODAL                                          -->
+      <!-- Opens when a game card is tapped. Explains the rules in 3-4  -->
+      <!-- bullets, then asks "Solo (1 player)" or "Multi (2+)".        -->
+      <!-- =========================================================== -->
+      <div id="game-tutorial" class="tutorial-modal" hidden>
+        <div class="tutorial-backdrop" data-action="close-tutorial"></div>
+        <div class="tutorial-sheet" role="dialog" aria-labelledby="tut-title">
+          <button class="tutorial-close" data-action="close-tutorial" aria-label="Close">×</button>
+          <div class="tutorial-icon" id="tut-icon"></div>
+          <h2 class="tutorial-title" id="tut-title">Game</h2>
+          <p class="tutorial-sub" id="tut-sub"></p>
+          <ul class="tutorial-rules" id="tut-rules"></ul>
+          <div class="tutorial-modes">
+            <button class="tutorial-mode" data-action="play-mode" data-mode="solo">
+              <span class="mode-eyebrow">Solo</span>
+              <span class="mode-label">1 player</span>
+            </button>
+            <button class="tutorial-mode is-primary" data-action="play-mode" data-mode="multi">
+              <span class="mode-eyebrow">Multi</span>
+              <span class="mode-label">2+ players</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- =========================================================== -->
+      <!-- NICKNAME DIALOG                                              -->
+      <!-- Small in-page modal asking for a name when a Multi room is   -->
+      <!-- being created (no separate /host route anymore).             -->
+      <!-- =========================================================== -->
+      <div id="nickname-dialog" class="nick-dialog" hidden>
+        <div class="nick-backdrop" data-action="close-nick"></div>
+        <div class="nick-sheet" role="dialog" aria-labelledby="nick-title">
+          <button class="nick-close" data-action="close-nick" aria-label="Close">×</button>
+          <h3 class="nick-title" id="nick-title">Pick a nickname</h3>
+          <p class="nick-sub" id="nick-sub">Your friends will see this in the room.</p>
+          <input id="nick-input" class="nick-input" type="text" maxlength="14"
+                 placeholder="e.g. FlagHunter" autocomplete="off" />
+          <button id="nick-go" class="btn btn-primary nick-go">Create room</button>
+        </div>
+      </div>
 
       <!-- =========================================================== -->
       <!-- COUNTRY PICKER MODAL                                         -->

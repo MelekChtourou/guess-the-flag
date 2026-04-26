@@ -335,6 +335,72 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 @keyframes stars-twinkle-a { from { opacity: 0.45; } to { opacity: 0.95; } }
 @keyframes stars-twinkle-b { from { opacity: 0.30; } to { opacity: 0.75; } }
 
+/* --- Celestial theme toggles (sun + moon) -----------------------
+   Two interactive bodies in the background. They sit far from the
+   globe (top corners), are always visible regardless of theme, and
+   tap = swap theme. The active theme's body glows; the inactive
+   one is dim and recedes a little.                                  */
+
+.celestial {
+  position: absolute;
+  width: 88px;
+  height: 88px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 5;
+  transition: transform 600ms var(--ease), opacity 600ms var(--ease), filter 600ms var(--ease);
+}
+.celestial svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.celestial:hover { transform: scale(1.06); }
+.celestial:active { transform: scale(0.96); }
+
+/* Sun — top-right quadrant, far from the globe. */
+.celestial-sun {
+  top: max(96px, calc(env(safe-area-inset-top) + 84px));
+  right: -14px;
+}
+.celestial-sun .sun-rays {
+  transform-origin: 50px 50px;
+  transform-box: fill-box;
+  animation: sun-spin 22s linear infinite;
+}
+@keyframes sun-spin { to { transform: rotate(360deg); } }
+
+/* Moon — bottom-left, low on the page above the tray. */
+.celestial-moon {
+  bottom: 28%;
+  left: -14px;
+  width: 78px;
+  height: 78px;
+  animation: moon-bob 8s ease-in-out infinite;
+}
+@keyframes moon-bob {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50%      { transform: translateY(-6px) rotate(2deg); }
+}
+
+/* Active-theme treatment: glow + full opacity. Inactive: dim + smaller. */
+[data-theme="light"] .celestial-sun  { opacity: 1;    filter: drop-shadow(0 0 28px rgba(255,180,80,0.7));  }
+[data-theme="light"] .celestial-moon { opacity: 0.42; filter: none; transform: scale(0.78); }
+[data-theme="dark"]  .celestial-sun  { opacity: 0.42; filter: none; transform: scale(0.78); }
+[data-theme="dark"]  .celestial-moon { opacity: 1;    filter: drop-shadow(0 0 28px rgba(220,220,255,0.45)); }
+/* Hover keeps the scale boost regardless of theme — keep the dim one
+   reachable. */
+[data-theme="light"] .celestial-moon:hover { transform: scale(0.86); }
+[data-theme="dark"]  .celestial-sun:hover  { transform: scale(0.86); }
+@media (prefers-reduced-motion: reduce) {
+  .celestial-sun .sun-rays { animation: none; }
+  .celestial-moon { animation: none; }
+}
+
+/* On bigger screens, push them further into the corners + bigger. */
+@media (min-width: 768px) {
+  .celestial-sun  { width: 120px; height: 120px; top: 12vh; right: 4vw; }
+  .celestial-moon { width: 110px; height: 110px; bottom: 18vh; left: 4vw; }
+}
+
 /* Vignette darkens the edges so the globe pops in the center. */
 .atlas-vignette {
   position: absolute;
@@ -509,6 +575,225 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 @media (prefers-reduced-motion: reduce) {
   .atlas-hint, .atlas-hint-ping .ping-ring { animation: none; opacity: 1; }
 }
+
+/* --- Game tutorial modal --------------------------------------- */
+
+.tutorial-modal[hidden] { display: none !important; }
+.tutorial-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 240ms var(--ease);
+}
+.tutorial-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.tutorial-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 28px 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  animation: pickerSlideUp 320ms var(--ease);
+}
+.tutorial-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+.tutorial-close:hover { color: var(--text); background: var(--surface-hover); }
+
+.tutorial-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 4px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tutorial-icon svg { width: 100%; height: 100%; }
+.tutorial-title {
+  text-align: center;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.tutorial-sub {
+  text-align: center;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.tutorial-rules {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tutorial-rules li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.45;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.tutorial-rules li::before {
+  content: "•";
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.tutorial-modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+.tutorial-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 200ms var(--ease), border-color 200ms var(--ease), transform 100ms var(--ease);
+}
+.tutorial-mode:hover { background: var(--surface-hover); border-color: var(--accent); }
+.tutorial-mode:active { transform: scale(0.98); }
+.tutorial-mode.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1206;
+}
+.tutorial-mode.is-primary:hover { filter: brightness(1.05); }
+.mode-eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+  opacity: 0.7;
+}
+.tutorial-mode.is-primary .mode-eyebrow { opacity: 0.6; }
+.mode-label {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* --- Nickname dialog (in-page modal) --------------------------- */
+
+.nick-dialog[hidden] { display: none !important; }
+.nick-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 120;        /* sits above tutorial */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 240ms var(--ease);
+}
+.nick-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.nick-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: 24px 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+  animation: pickerSlideUp 320ms var(--ease);
+}
+.nick-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 20px;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+.nick-close:hover { color: var(--text); background: var(--surface-hover); }
+.nick-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.nick-sub {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.nick-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  font-size: 17px;
+  text-align: center;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font);
+  transition: border-color 200ms var(--ease);
+}
+.nick-input::placeholder { color: var(--text-faint); }
+.nick-input:focus { border-color: var(--accent); background: var(--surface-strong); }
+.nick-go { margin-top: 4px; }
 
 /* --- Country picker modal -------------------------------------- */
 
@@ -810,7 +1095,17 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
   opacity: 0.4;
   pointer-events: none;
 }
-.tray-card-icon { font-size: 26px; line-height: 1; }
+.tray-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--accent);
+  font-size: 26px;       /* used as fallback if a card still has emoji content */
+  line-height: 1;
+}
+.tray-card-icon svg { width: 100%; height: 100%; display: block; }
 .tray-card-name { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
 .tray-card-sub  { font-size: 10px; color: var(--text-faint); line-height: 1.2; }
 

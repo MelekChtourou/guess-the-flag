@@ -14,10 +14,51 @@
 
 (function () {
   const state = {
-    mode: "solo",
-    continent: null,         // null = worldwide
-    country: null,           // null = no country selected
+    continent: null,         // null = worldwide (set by globe tap)
+    country: null,           // null = no country picked
+    pendingGame: null,       // game id staged by the tutorial modal
   };
+
+  // Per-game tutorial copy. Each entry drives the tutorial modal that
+  // opens when the user taps a game card. Rules are 3 short bullets,
+  // game-specific. Icons reuse the SVGs from the tray cards (cloned
+  // at open time so they pick up theme colors).
+  const TUTORIALS = {
+    flag: {
+      title: "Guess the Flag",
+      sub:   "10 rounds. 15 seconds each. The world is your atlas.",
+      rules: [
+        "We show you a flag — pick the right country from 4 options.",
+        "Score: 100 base + a speed bonus + a streak bonus.",
+        "Same-continent decoys keep it fair (no obvious mismatch).",
+      ],
+    },
+    capital: {
+      title: "Guess the Capital",
+      sub:   "Read the city — name the country it belongs to.",
+      rules: [
+        "We show a capital city, you pick the right country from 4.",
+        "10 rounds, 15 seconds each, same scoring as Flags.",
+        "Decoys are same-continent neighbors so it stays fair.",
+      ],
+    },
+    population: {
+      title: "Population Showdown",
+      sub:   "Two countries. Tap the one with more people.",
+      rules: [
+        "Each round: a head-to-head between two countries.",
+        "12 seconds per duel — speed gives you bigger bonus.",
+        "10 duels per game; both flags count toward your collection.",
+      ],
+    },
+  };
+
+  function tutorialIconSvgFor(game) {
+    // Clone the icon SVG straight from the tray-card so the tutorial
+    // matches what the user just tapped.
+    const card = document.querySelector(`.tray-card[data-game="${game}"] .tray-card-icon`);
+    return card ? card.innerHTML : "";
+  }
 
   // Tiny in-memory cache of /api/country-summary results keyed by code.
   const countrySummaryCache = new Map();
@@ -25,29 +66,85 @@
   function $(id) { return document.getElementById(id); }
   function $$(sel) { return [...document.querySelectorAll(sel)]; }
 
-  // --- Mode chips --------------------------------------------------
+  // --- Tutorial modal (per-game) -----------------------------------
+  //
+  // Tap a game card → open the tutorial → user picks Solo or Multi →
+  // Solo: launch immediately, Multi: open nickname dialog → lobby.
 
-  function setMode(mode) {
-    state.mode = mode;
-    $$(".mode-chip").forEach((c) => {
-      const on = c.dataset.mode === mode;
-      c.classList.toggle("is-active", on);
-      c.setAttribute("aria-selected", String(on));
+  function openTutorial(game) {
+    const cfg = TUTORIALS[game];
+    if (!cfg) return;
+    state.pendingGame = game;
+
+    const modal = $("game-tutorial");
+    if (!modal) return;
+    document.getElementById("tut-icon").innerHTML  = tutorialIconSvgFor(game);
+    document.getElementById("tut-title").textContent = cfg.title;
+    document.getElementById("tut-sub").textContent   = cfg.sub;
+    const rules = document.getElementById("tut-rules");
+    rules.innerHTML = "";
+    cfg.rules.forEach((r) => {
+      const li = document.createElement("li");
+      li.textContent = r;
+      rules.appendChild(li);
     });
-    // Show extra controls when in Multi mode (e.g. "Join with code").
-    const tray = $("tray-multi-actions");
-    if (tray) tray.hidden = (mode !== "multi");
-    refreshDailyQuick();
-    updateGameCardStates();
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
   }
 
-  function updateGameCardStates() {
-    // In Daily mode, only Flag is currently available — dim the others.
-    $$(".tray-card[data-game]").forEach((card) => {
-      const isFlag = card.dataset.game === "flag";
-      const disabled = state.mode === "daily" && !isFlag;
-      card.classList.toggle("is-disabled", disabled);
-    });
+  function closeTutorial() {
+    const modal = $("game-tutorial");
+    if (modal) modal.hidden = true;
+    document.body.style.overflow = "";
+    state.pendingGame = null;
+  }
+
+  // Called when the user taps Solo or Multi inside the tutorial.
+  function chooseMode(mode) {
+    const game = state.pendingGame;
+    if (!game) return;
+    closeTutorial();
+    if (mode === "solo") {
+      launchSolo(game);
+    } else if (mode === "multi") {
+      openNickname(game);
+    }
+  }
+
+  function launchSolo(game) {
+    const params = state.continent ? `?continent=${encodeURIComponent(state.continent)}` : "";
+    window.Router.go(`/${game}${params}`);
+  }
+
+  // --- Nickname dialog (Multi flow) -------------------------------
+
+  function openNickname(game) {
+    const dialog = $("nickname-dialog");
+    if (!dialog) return;
+    dialog.dataset.game = game;
+    document.getElementById("nick-input").value = "";
+    document.getElementById("nick-sub").textContent =
+      `Creating a ${TUTORIALS[game]?.title || game} room. Friends will join with the code.`;
+    dialog.hidden = false;
+    document.body.style.overflow = "hidden";
+    setTimeout(() => document.getElementById("nick-input")?.focus(), 80);
+  }
+  function closeNickname() {
+    const dialog = $("nickname-dialog");
+    if (dialog) dialog.hidden = true;
+    document.body.style.overflow = "";
+  }
+  function commitNicknameDialog() {
+    const dialog = $("nickname-dialog");
+    if (!dialog) return;
+    const game = dialog.dataset.game || "flag";
+    const name = (document.getElementById("nick-input").value || "").trim();
+    if (!name) {
+      if (window.UI) window.UI.toast("Pick a nickname first");
+      return;
+    }
+    closeNickname();
+    if (window.Multiplayer) window.Multiplayer.create(name, game);
   }
 
   // --- Continent state ---------------------------------------------
@@ -299,39 +396,8 @@
     if (lvl) lvl.textContent = `Lv. ${s.level}`;
   }
 
-  // --- Game card click dispatcher ----------------------------------
-  //
-  // Composes mode + continent into a navigation. Continent is currently
-  // surfaced as a query string the game controllers respect (see
-  // games/flag.js etc — they pass it to /api/*-questions in Wave 7).
-
-  function launchGame(id) {
-    if (state.mode === "daily" && id !== "flag") {
-      if (window.UI) window.UI.toast(`Daily for ${id} coming soon`);
-      return;
-    }
-    if (state.mode === "multi") {
-      // The host's preferred game is queued client-side and sent to the
-      // server with `room:setGame` once we're in the lobby. Letting the
-      // host change it from the lobby tabs still works.
-      if (window.Multiplayer) window.Multiplayer.setGame(id);  // no-op if not yet in room
-      // Stash the desired game type on the multi state so it gets sent
-      // immediately after room creation.
-      if (window.Multiplayer && window.Multiplayer.queueGame) window.Multiplayer.queueGame(id);
-      window.Router.go("/host?game=" + encodeURIComponent(id));
-      return;
-    }
-    if (state.mode === "daily") {
-      window.Router.go("/daily");
-      return;
-    }
-    // Solo: pass the continent filter as a query param if set.
-    const path = "/" + id;
-    const url = state.continent
-      ? `${path}?continent=${encodeURIComponent(state.continent)}`
-      : path;
-    window.Router.go(url);
-  }
+  // (launchGame() and the old mode-chip flow were removed; the
+  // tutorial modal now drives game launch via launchSolo / openNickname.)
 
   // Read the continent off the current URL — used by the game controllers
   // to filter their fetch.
@@ -343,28 +409,46 @@
   // --- Boot --------------------------------------------------------
 
   document.addEventListener("DOMContentLoaded", () => {
-    // Mode chip clicks.
-    $$(".mode-chip").forEach((c) => {
-      c.addEventListener("click", () => {
+    // Game card clicks now open the tutorial overlay (with mode picker).
+    $$(".tray-card[data-game]").forEach((card) => {
+      card.addEventListener("click", (e) => {
+        e.stopImmediatePropagation();   // prevent global delegated handler
         if (window.Sound) window.Sound.play("tap");
-        setMode(c.dataset.mode);
+        openTutorial(card.dataset.game);
       });
     });
 
-    // Game card clicks (delegated through app.js global handler too —
-    // we handle directly here to inject mode + continent context).
-    $$(".tray-card[data-game]").forEach((card) => {
-      card.addEventListener("click", (e) => {
-        if (card.classList.contains("is-disabled")) {
-          e.stopImmediatePropagation();
-          if (window.UI) window.UI.toast("Not available in this mode yet");
-          return;
-        }
-        // Prevent the global delegated handler from also routing.
+    // Tutorial controls.
+    document.addEventListener("click", (e) => {
+      const close = e.target.closest('[data-action="close-tutorial"]');
+      if (close) { e.stopImmediatePropagation(); closeTutorial(); return; }
+      const mode = e.target.closest('[data-action="play-mode"]');
+      if (mode) {
         e.stopImmediatePropagation();
         if (window.Sound) window.Sound.play("tap");
-        launchGame(card.dataset.game);
+        chooseMode(mode.dataset.mode);
+        return;
+      }
+      const closeNick = e.target.closest('[data-action="close-nick"]');
+      if (closeNick) { e.stopImmediatePropagation(); closeNickname(); return; }
+    });
+
+    // Nickname dialog: commit on button + Enter.
+    const nickGo = document.getElementById("nick-go");
+    if (nickGo) nickGo.addEventListener("click", commitNicknameDialog);
+    const nickInput = document.getElementById("nick-input");
+    if (nickInput) {
+      nickInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") commitNicknameDialog();
       });
+    }
+    // Esc closes either modal.
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const t = document.getElementById("game-tutorial");
+      const n = document.getElementById("nickname-dialog");
+      if (n && !n.hidden) closeNickname();
+      else if (t && !t.hidden) closeTutorial();
     });
 
     // Continent clear button (legacy fallback).
@@ -453,10 +537,9 @@
     }, 8000);
 
     // Initial fill.
-    setMode("solo");
     refreshDailyQuick();
     refreshProfileBadge();
   });
 
-  window.Menu = { setMode, setContinent, setCountry, continentFromUrl, refreshDailyQuick, refreshProfileBadge };
+  window.Menu = { setContinent, setCountry, continentFromUrl, refreshDailyQuick, refreshProfileBadge, openTutorial };
 })();
