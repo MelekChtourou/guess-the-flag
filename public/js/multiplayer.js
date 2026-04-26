@@ -192,9 +192,11 @@
     socket.emit("room:create", { name }, (resp) => {
       if (resp && resp.error) {
         window.UI.toast(resp.error);
-        window.App.show("menu");
+        window.Router.go("/");
         return;
       }
+      // Switch the URL to /r/CODE so refresh / share-link works.
+      window.history.replaceState({ path: `/r/${resp.code}` }, "", `/r/${resp.code}`);
       window.App.show("lobby");
     });
   }
@@ -206,6 +208,8 @@
         window.UI.toast(resp.error);
         return;
       }
+      // Land us on /r/CODE so refresh keeps us tied to this room.
+      window.history.replaceState({ path: `/r/${code}` }, "", `/r/${code}`);
       window.App.show("lobby");
     });
   }
@@ -229,7 +233,9 @@
 
     document.getElementById("lobby-share").addEventListener("click", async () => {
       if (!state.code) return;
-      const url = `${location.origin}/?room=${state.code}`;
+      // Use the canonical /r/CODE URL so the link looks clean and is
+      // bookmarkable.
+      const url = `${location.origin}/r/${state.code}`;
       try {
         await navigator.clipboard.writeText(url);
         window.UI.toast("Link copied");
@@ -237,17 +243,8 @@
         window.UI.toast(`Code: ${state.code}`);
       }
     });
-
-    // Deep-link: ?room=ABCD
-    const params = new URLSearchParams(location.search);
-    const preCode = (params.get("room") || "").toUpperCase();
-    if (preCode.length === 4) {
-      const codeInput = document.getElementById("join-code-input");
-      setTimeout(() => {
-        document.querySelector('[data-action="join-room"]').click();
-        codeInput.value = preCode;
-      }, 50);
-    }
+    // Deep-linking via /r/ABCD is now handled by router.js, which calls
+    // App.openNickname("join-room", { code }) automatically.
   });
 
   window.Multiplayer = { create, join, startGame, leave, isInRoom, isHost };

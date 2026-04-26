@@ -72,6 +72,18 @@ app.get("/api/daily-questions", (req, res) => {
   });
 });
 
+// SPA catchall — any unmatched GET that isn't an API call or static
+// asset gets index.html so the History API router can pick it up.
+// (This is what makes refreshing /stats or hitting /r/ABCD directly
+// actually work.) The static middleware above handles real files; this
+// runs for everything that fell through.
+app.get(/^\/(?!api\/|socket\.io\/).*/, (req, res, next) => {
+  // Don't serve HTML for paths that look like a missing static file
+  // (i.e. they have a file extension). Let the 404 chain handle them.
+  if (/\.[a-z0-9]{1,5}$/i.test(req.path)) return next();
+  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+});
+
 // Wire up multiplayer.
 registerSocketHandlers(io);
 

@@ -1,22 +1,35 @@
-// Top-level app glue:
-//   - Show/hide screens (the SPA "router")
-//   - Wire up menu / nickname / shared back-buttons
-//   - Hand off to Solo or Multiplayer controllers based on user choice
+// Top-level app glue.
+//
+// Single-page app on top of the History-API router (router.js):
+//   - All navigation goes through Router.go(path), which updates the
+//     URL and dispatches to the right mode controller.
+//   - App.show(name) is the low-level screen swap, used by mode
+//     controllers for in-flight transitions (lobby → game → results)
+//     that don't get their own URL.
+//   - data-action="..." attributes on buttons drive both menu navigation
+//     and in-screen actions like "play again".
+//
+// The router decides when to start/leave Solo, Daily, and Multiplayer.
+// app.js no longer calls .start() directly from a click handler.
 
 (function () {
   const SCREENS = ["menu", "nickname", "lobby", "game", "round-end", "results", "stats"];
 
-  // --- Routing -------------------------------------------------------
+  // Internal screen swap. Mode controllers call this for non-routed
+  // transitions (e.g. multiplayer.js calls App.show("lobby") on join).
   function show(name) {
     SCREENS.forEach((s) => {
       const el = document.getElementById(`screen-${s}`);
       if (!el) return;
       el.classList.toggle("screen-active", s === name);
     });
-    // Refresh derived UI on certain screens.
     if (name === "menu" && window.Profile)  refreshProfileBadge();
     if (name === "menu" && window.Daily)    window.Daily.refreshMenuCard();
     if (name === "stats" && window.Profile) renderStatsScreen();
+    // Scroll back to top whenever we land on a new screen — small
+    // touch that fixes the "why is the page scrolled" oddity when
+    // jumping from a long results panel back to the menu.
+    window.scrollTo(0, 0);
   }
 
   function refreshProfileBadge() {
@@ -37,7 +50,6 @@
     document.getElementById("stats-daily-streak").textContent = p.daily.currentStreak;
     document.getElementById("stats-total-correct").textContent = p.totalCorrect;
 
-    // Continent rows — one per known continent, with a progress bar.
     const continents = ["Africa", "Asia", "Europe", "North America", "South America", "Oceania"];
     const wrap = document.getElementById("stats-continents");
     wrap.innerHTML = "";
@@ -55,12 +67,10 @@
     });
   }
 
-  // --- Nickname screen modes ----------------------------------------
-  // Reused for both "create room" (just nickname) and "join room"
-  // (nickname + room code). `pendingAction` decides which.
+  // --- Nickname screen modes (used for /host and /join) -------------
   let pendingAction = null;
 
-  function openNicknameScreen(action) {
+  function openNickname(action, opts = {}) {
     pendingAction = action;
     const title = document.getElementById("nickname-title");
     const extra = document.getElementById("nickname-extra");
@@ -73,9 +83,8 @@
     } else if (action === "join-room") {
       title.textContent = "Join a room";
       extra.hidden = false;
-      codeInput.value = "";
+      codeInput.value = (opts.code || "").toUpperCase();
     }
-    nick.value = nick.value || "";
     show("nickname");
     setTimeout(() => nick.focus(), 100);
   }
@@ -115,42 +124,50 @@
     });
     document.getElementById("nickname-go").addEventListener("click", commitNickname);
 
-    // Delegated handler for any [data-action] button.
+    // Delegated click handler for any [data-action] element. All routes
+    // are pushed through Router.go so the URL stays in sync with the UI.
     document.addEventListener("click", (e) => {
       const t = e.target.closest("[data-action]");
       if (!t) return;
       const action = t.dataset.action;
-      // Tactile click feedback on every menu / nav action.
       if (window.Sound) window.Sound.play("tap");
 
-      if (action === "solo")          window.Solo.start();
-      else if (action === "daily")      window.Daily.start();
-      else if (action === "stats")      show("stats");
-      else if (action === "create-room") openNicknameScreen("create-room");
-      else if (action === "join-room")   openNicknameScreen("join-room");
-      else if (action === "back-to-menu") {
-        window.Solo.leave();
-        if (window.Daily) window.Daily.leave();
-        window.Multiplayer.leave();
-        show("menu");
-      }
-      else if (action === "play-again") {
-        if (window.Multiplayer.isInRoom()) {
-          // Multiplayer rematch: only the host can start; others wait in lobby.
-          window.App.show("lobby");
-          if (window.Multiplayer.isHost()) {
-            window.Multiplayer.startGame();
+      switch (action) {
+        case "solo":           window.Router.go("/solo"); break;
+        case "daily":          window.Router.go("/daily"); break;
+        case "stats":          window.Router.go("/stats"); break;
+        case "create-room":    window.Router.go("/host"); break;
+        case "join-room":      window.Router.go("/join"); break;
+        case "back":
+          // Browser-back if we have history, otherwise menu.
+          if (history.length > 1 && document.referrer) history.back();
+          else window.Router.go("/");
+          break;
+        case "back-to-menu":   window.Router.go("/"); break;
+        case "play-again":
+          if (window.Multiplayer.isInRoom()) {
+            // Multiplayer rematch: only the host can start; others wait.
+            show("lobby");
+            if (window.Multiplayer.isHost()) {
+              window.Multiplayer.startGame();
+            } else {
+              window.UI.toast("Waiting for the host…");
+            }
           } else {
-            window.UI.toast("Waiting for the host…");
+            // Solo / daily: re-enter the same route so the controller
+            // restarts cleanly.
+            const path = location.pathname.startsWith("/daily") ? "/daily" : "/solo";
+            // Force a re-handle even though the URL is the same.
+            window.Router.handle(path);
           }
-        } else {
-          window.Solo.start();
-        }
+          break;
       }
     });
 
-    show("menu");
+    // Boot the router last — it'll pick up the current location and
+    // dispatch (e.g. landing on /stats or /r/ABCD directly works).
+    window.Router.init();
   });
 
-  window.App = { show };
+  window.App = { show, openNickname };
 })();
