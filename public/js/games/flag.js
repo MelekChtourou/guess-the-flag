@@ -1,12 +1,14 @@
-// Solo-mode controller.
+// Mini-game: Guess the Flag.
 //
 // Flow:
 //   1. Fetch /api/solo-questions to get a fresh set of N questions.
-//   2. Render flag + options, start a 15s timer.
-//   3. Player answers (or times out) -> reveal panel opens (handled by
-//      Game.revealAnswer) and stays until the player taps Next.
-//   4. Tap Next -> advance to the next round.
-//   5. After the last round, jump to the results screen with a tier label.
+//   2. Render flag + 4 country options, start a 15s timer.
+//   3. Player answers (or times out) → reveal panel with country detail.
+//   4. Tap Next → advance to the next round.
+//   5. After the last round, jump to the results screen with a tier label
+//      and a share card.
+//
+// Registers itself as `window.Games.flag` so the hub can spawn it.
 
 (function () {
   const ROUND_MS = 15000;
@@ -22,7 +24,7 @@
     score: 0,
     streak: 0,
     longestStreak: 0,
-    results: [],   // "correct" | "wrong" | "timeout" — used for the share card
+    results: [],
     roundStartedAt: 0,
     timeoutHandle: null,
   };
@@ -54,17 +56,17 @@
       state.questions = await fetchQuestions(10);
     } catch (err) {
       window.UI.toast("Couldn't load questions — try again");
-      window.App.show("menu");
+      window.Router.go("/");
       return;
     }
     window.App.show("game");
+    window.Game.setQuestionStyle("flag");   // tells the engine to show the flag image
     window.Game.updateHud({
       round: 1,
       total: state.questions.length,
       score: 0,
       streak: 0,
     });
-    // Wire the Next button for solo: advance immediately.
     window.Game.onNextClick(() => {
       state.index += 1;
       nextRound();
@@ -74,7 +76,6 @@
 
   function nextRound() {
     if (state.index >= state.questions.length) return finish();
-
     const question = state.questions[state.index];
     state.roundStartedAt = Date.now();
 
@@ -84,7 +85,6 @@
       onAnswer: (picked) => onAnswer(picked),
     });
 
-    // Server-style timeout: if no answer in ROUND_MS, score it as a miss.
     state.timeoutHandle = setTimeout(() => onAnswer(null), ROUND_MS);
   }
 
@@ -121,7 +121,6 @@
 
     window.Game.updateHud({ score: state.score, streak: state.streak });
 
-    // Show the reveal panel; it stays open until the player taps Next.
     const lastRound = state.index + 1 >= state.questions.length;
     window.Game.revealAnswer(question.correct, picked, {
       nextLabel: lastRound ? "See results →" : "Next →",
@@ -135,7 +134,6 @@
     document.getElementById("results-score").textContent = `${state.score} pts`;
     document.getElementById("results-scores").hidden = true;
 
-    // Update profile + render the share card.
     if (window.Profile) {
       window.Profile.recordGame({
         score: state.score,
@@ -161,19 +159,30 @@
       .join("");
     const correctCount = state.results.filter((r) => r === "correct").length;
     wrap.querySelector(".share-summary").textContent =
-      `Solo · ${correctCount}/${state.results.length} · ${state.score} pts`;
+      `Flags · ${correctCount}/${state.results.length} · ${state.score} pts`;
     wrap.querySelector(".share-btn").onclick = () =>
       window.Share.share(window.Share.format({
         mode: "solo",
+        title: "Atlas — Flags",
         results: state.results,
         score: state.score,
         streak: state.longestStreak,
-      }), "Guess the Flag");
+      }), "Atlas");
   }
 
   function leave() {
     clearTimers();
   }
 
+  window.Games = window.Games || {};
+  window.Games.flag = {
+    id:    "flag",
+    title: "Guess the Flag",
+    icon:  "🚩",
+    start, leave,
+  };
+
+  // Back-compat: the old window.Solo namespace is still referenced by app.js.
+  // We'll clean those callers up in the same wave.
   window.Solo = { start, leave };
 })();

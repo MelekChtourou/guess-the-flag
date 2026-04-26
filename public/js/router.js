@@ -15,7 +15,10 @@
   const ROUTES = [
     { match: /^\/$/,                       handler: routeMenu  },
     { match: /^\/daily\/?$/,               handler: routeDaily },
-    { match: /^\/solo\/?$/,                handler: routeSolo  },
+    { match: /^\/flag\/?$/,                handler: routeFlag  },
+    { match: /^\/capital\/?$/,             handler: routeCapital },
+    { match: /^\/population\/?$/,          handler: routePopulation },
+    { match: /^\/solo\/?$/,                handler: routeFlag  },     // back-compat
     { match: /^\/stats\/?$/,               handler: routeStats },
     { match: /^\/host\/?$/,                handler: routeHost  },
     { match: /^\/join\/?$/,                handler: routeJoin  },
@@ -29,7 +32,9 @@
   // Whenever the route changes, clean up the previous mode so timers
   // and sockets don't leak. Each controller already exposes leave().
   function leaveAll() {
-    if (window.Solo)        window.Solo.leave();
+    if (window.Games) {
+      Object.values(window.Games).forEach((g) => { if (typeof g.leave === "function") g.leave(); });
+    }
     if (window.Daily)       window.Daily.leave();
     if (window.Multiplayer) window.Multiplayer.leave();
   }
@@ -46,9 +51,22 @@
     else { window.App.show("menu"); }
   }
 
-  function routeSolo() {
+  function routeFlag() {
     leaveAll();
-    if (window.Solo) window.Solo.start();
+    if (window.Games && window.Games.flag) window.Games.flag.start();
+    else if (window.Solo) window.Solo.start();   // ultra-defensive fallback
+    else { window.App.show("menu"); }
+  }
+
+  function routeCapital() {
+    leaveAll();
+    if (window.Games && window.Games.capital) window.Games.capital.start();
+    else { window.App.show("menu"); }
+  }
+
+  function routePopulation() {
+    leaveAll();
+    if (window.Games && window.Games.population) window.Games.population.start();
     else { window.App.show("menu"); }
   }
 

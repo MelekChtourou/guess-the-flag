@@ -20,26 +20,32 @@
 
   function $(id) { return document.getElementById(id); }
   function init() {
-    els.flag      = $("flag-img");
-    els.options   = $("options");
-    els.timer     = $("timer-bar");
-    els.timerWrap = document.querySelector(".timer-wrap");
-    els.flagStage = document.querySelector(".flag-stage");
-    els.round     = $("hud-round");
-    els.total     = $("hud-total");
-    els.score     = $("hud-score");
-    els.streak    = $("hud-streak");
-    els.reaction  = $("reaction");
-    els.stage     = $("screen-game");
-    els.next      = $("cp-next");
+    els.flag         = $("flag-img");
+    els.options      = $("options");
+    els.timer        = $("timer-bar");
+    els.timerWrap    = document.querySelector(".timer-wrap");
+    els.flagStage    = document.querySelector(".flag-stage");
+    els.capitalStage = $("capital-stage");
+    els.capitalText  = $("capital-text");
+    els.round        = $("hud-round");
+    els.total        = $("hud-total");
+    els.score        = $("hud-score");
+    els.streak       = $("hud-streak");
+    els.reaction     = $("reaction");
+    els.stage        = $("screen-game");
+    els.next         = $("cp-next");
 
-    // The Next button always exists in the DOM; the active mode controller
-    // installs a callback via onNextClick().
     els.next.addEventListener("click", () => {
       if (window.Sound) window.Sound.play("tap");
       if (typeof nextHandler === "function") nextHandler();
     });
   }
+
+  // The "stimulus" — the visual the player has to identify. Different
+  // mini-games swap this between flag image, capital city name, etc.
+  // Defaults to "flag" for back-compat.
+  let questionStyle = "flag";
+  function setQuestionStyle(style) { questionStyle = style; }
 
   function flagUrl(code) { return `https://flagcdn.com/w320/${code}.png`; }
 
@@ -75,13 +81,26 @@
     window.Country.hide();
     els.options.style.display = "";
     els.timerWrap.style.display = "";
-    els.flagStage.style.display = "";
 
-    els.flag.src = flagUrl(question.flagCode);
-    els.flag.alt = "Flag to guess";
-    els.flag.style.animation = "none";
-    void els.flag.offsetWidth;
-    els.flag.style.animation = "";
+    // Show whichever stimulus stage matches the current style.
+    if (questionStyle === "capital") {
+      els.flagStage.style.display = "none";
+      if (els.capitalStage) els.capitalStage.style.display = "";
+      if (els.capitalText) {
+        els.capitalText.textContent = question.capital;
+        els.capitalText.style.animation = "none";
+        void els.capitalText.offsetWidth;
+        els.capitalText.style.animation = "";
+      }
+    } else {
+      els.flagStage.style.display = "";
+      if (els.capitalStage) els.capitalStage.style.display = "none";
+      els.flag.src = flagUrl(question.flagCode);
+      els.flag.alt = "Flag to guess";
+      els.flag.style.animation = "none";
+      void els.flag.offsetWidth;
+      els.flag.style.animation = "";
+    }
 
     // Build options
     els.options.innerHTML = "";
@@ -187,6 +206,7 @@
     flagUrl,
     onNextClick,
     setNextButton,
+    setQuestionStyle,
     ROUND_MS_DEFAULT,
   };
 })();

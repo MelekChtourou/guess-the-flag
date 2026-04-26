@@ -13,7 +13,7 @@
 // app.js no longer calls .start() directly from a click handler.
 
 (function () {
-  const SCREENS = ["menu", "nickname", "lobby", "game", "round-end", "results", "stats"];
+  const SCREENS = ["menu", "nickname", "lobby", "game", "pop", "round-end", "results", "stats"];
 
   // Internal screen swap. Mode controllers call this for non-routed
   // transitions (e.g. multiplayer.js calls App.show("lobby") on join).
@@ -159,20 +159,24 @@
       if (window.Sound) window.Sound.play("tap");
 
       switch (action) {
-        case "solo":           window.Router.go("/solo"); break;
+        // Hub-card click — drives any registered mini-game by id.
+        case "game": {
+          const id = t.dataset.game;
+          if (id) window.Router.go("/" + id);
+          break;
+        }
+        case "solo":           window.Router.go("/flag"); break;
         case "daily":          window.Router.go("/daily"); break;
         case "stats":          window.Router.go("/stats"); break;
         case "create-room":    window.Router.go("/host"); break;
         case "join-room":      window.Router.go("/join"); break;
         case "back":
-          // Browser-back if we have history, otherwise menu.
           if (history.length > 1 && document.referrer) history.back();
           else window.Router.go("/");
           break;
         case "back-to-menu":   window.Router.go("/"); break;
         case "play-again":
           if (window.Multiplayer.isInRoom()) {
-            // Multiplayer rematch: only the host can start; others wait.
             show("lobby");
             if (window.Multiplayer.isHost()) {
               window.Multiplayer.startGame();
@@ -180,10 +184,9 @@
               window.UI.toast("Waiting for the host…");
             }
           } else {
-            // Solo / daily: re-enter the same route so the controller
-            // restarts cleanly.
-            const path = location.pathname.startsWith("/daily") ? "/daily" : "/solo";
-            // Force a re-handle even though the URL is the same.
+            // Re-enter whatever game route brought us here so the
+            // controller restarts cleanly. Default to /flag.
+            const path = location.pathname.match(/^\/(daily|flag|capital|population)/)?.[0] || "/flag";
             window.Router.handle(path);
           }
           break;

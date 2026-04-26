@@ -11,7 +11,14 @@ const http = require("http");
 const express = require("express");
 const { Server: SocketServer } = require("socket.io");
 
-const { buildQuestionSet, buildDailyQuestionSet, dailyDateString, dailyDayNumber } = require("./questions");
+const {
+  buildQuestionSet,
+  buildDailyQuestionSet,
+  buildCapitalQuestionSet,
+  buildPopulationQuestionSet,
+  dailyDateString,
+  dailyDayNumber,
+} = require("./questions");
 const { registerSocketHandlers } = require("./gameManager");
 const { loadDetails } = require("./countryDetails");
 const { COUNTRIES } = require("./countries");
@@ -63,6 +70,20 @@ app.get("/api/solo-questions", (req, res) => {
   const requested = parseInt(req.query.count, 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
   res.json({ questions: buildQuestionSet(count) });
+});
+
+// Capital-game question set: capital city → 4 country options.
+app.get("/api/capital-questions", (req, res) => {
+  const requested = parseInt(req.query.count, 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
+  res.json({ questions: buildCapitalQuestionSet(count) });
+});
+
+// Population Showdown question set: pairs of countries to compare.
+app.get("/api/population-questions", (req, res) => {
+  const requested = parseInt(req.query.count, 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 10;
+  res.json({ questions: buildPopulationQuestionSet(count) });
 });
 
 // Daily challenge. Same 10 questions for everyone on a given UTC day.

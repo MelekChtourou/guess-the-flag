@@ -1,7 +1,7 @@
 {
-  "name": "Guess the Flag",
-  "short_name": "Guess Flag",
-  "description": "How many flags do you actually know? A premium flag-guessing party game with daily challenges and multiplayer rooms.",
+  "name": "Atlas — A world of mini-games",
+  "short_name": "Atlas",
+  "description": "A world of geography mini-games. Flags, capitals, populations, daily challenges, and multiplayer rooms.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

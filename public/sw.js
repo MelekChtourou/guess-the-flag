@@ -10,7 +10,8 @@
 //
 // Bumping CACHE_VERSION evicts the old cache on next activate.
 
-const CACHE_VERSION = "gtf-v1";
+// Bumped when the asset list changes — old cache is purged on activate.
+const CACHE_VERSION = "atlas-v1";
 const ASSET_CACHE   = `${CACHE_VERSION}-assets`;
 const REMOTE_CACHE  = `${CACHE_VERSION}-remote`;
 
@@ -21,11 +22,15 @@ const PRECACHE = [
   "/js/sound.js",
   "/js/ui.js",
   "/js/profile.js",
+  "/js/achievements.js",
   "/js/share.js",
+  "/js/leaderboard.js",
   "/js/colorExtractor.js",
   "/js/country.js",
   "/js/game.js",
-  "/js/solo.js",
+  "/js/games/flag.js",
+  "/js/games/capital.js",
+  "/js/games/population.js",
   "/js/daily.js",
   "/js/multiplayer.js",
   "/js/router.js",

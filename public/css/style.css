@@ -279,7 +279,102 @@ body::before {
 
 .hero {
   text-align: center;
-  margin: 32px 0 8px;
+  margin: 16px 0 8px;
+}
+
+/* The hub-stage hosts the globe centered, with the orbit-ring spanning
+   the same square so the cards visually circle the globe. */
+.hub-stage {
+  position: relative;
+  /* Custom property the cards consume — distance from stage center to
+     each card's center. Tuned so cards sit clearly outside the globe. */
+  --orbit-radius: 138px;
+  width: min(96vw, 360px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hub-stage .globe-canvas {
+  /* Globe sized smaller so cards don't overlap it. */
+  width: 50%;
+  height: 50%;
+  margin: 0;
+}
+
+/* The orbit-ring is the layer that holds the cards around the globe.
+   We tried a continuous orbit animation but the synchronization between
+   the ring's rotation and each card's counter-rotation isn't reliable
+   across browsers — instead the cards float at fixed positions around
+   the globe, which still feels premium because the globe itself spins. */
+.orbit-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hub-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 76px;
+  height: 76px;
+  /* Each card is placed at angle X around the stage center, at a fixed
+     pixel radius (--orbit-radius set on .hub-stage). Counter-rotate so
+     the card stays upright regardless of its orbit angle. */
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--orbit-angle, 0deg))
+    translateY(calc(-1 * var(--orbit-radius, 138px)))
+    rotate(calc(-1 * var(--orbit-angle, 0deg)));
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 200ms var(--ease), border-color 200ms var(--ease);
+}
+.hub-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+.hub-card:active {
+  /* Subtle scale-down on tap; the inline transform above handles position. */
+  filter: brightness(0.9);
+}
+.hub-card.is-locked {
+  opacity: 0.45;
+  cursor: default;
+  border-color: var(--border);
+}
+.hub-card-icon { font-size: 22px; line-height: 1; }
+.hub-card-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+}
+.hub-card-soon {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 700;
+}
+
+@media (min-width: 600px) {
+  .hub-stage { width: 420px; --orbit-radius: 165px; }
+  .hub-card  { width: 92px; height: 92px; }
 }
 .hero-flag {
   font-size: 56px;
@@ -622,6 +717,51 @@ body::before {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+
+/* Capital game stimulus: a big city name centered in a glass card. */
+.capital-stage {
+  flex: 0 0 auto;
+  aspect-ratio: 3 / 2;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.capital-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, var(--accent-soft) 0%, transparent 65%);
+  pointer-events: none;
+}
+.capital-stage-prompt {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+  position: relative;
+}
+.capital-text {
+  position: relative;
+  font-size: clamp(28px, 8vw, 44px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  line-height: 1.1;
+  animation: popIn 320ms var(--ease);
+  word-break: keep-all;
+}
 .flag-stage img {
   max-width: 88%;
   max-height: 88%;
@@ -686,6 +826,87 @@ body::before {
 }
 .reaction-fact {
   display: none; /* moved to the country detail panel */
+}
+
+/* =====================================================================
+   POPULATION SHOWDOWN — split-screen A vs B
+   ===================================================================== */
+
+.pop-prompt {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.pop-versus {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 8px;
+  align-items: center;
+  /* No flex:1 — let the cards size to their content rather than filling
+     all vertical space. */
+}
+.pop-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: all 250ms var(--ease);
+  text-align: center;
+  min-width: 0;
+}
+.pop-side:hover { background: var(--surface-hover); }
+.pop-side:active { transform: scale(0.98); }
+.pop-side.is-correct {
+  background: var(--good-soft);
+  border-color: var(--good);
+}
+.pop-side.is-wrong {
+  background: var(--bad-soft);
+  border-color: var(--bad);
+  animation: shakeBad 320ms var(--ease);
+}
+.pop-side.is-muted { opacity: 0.5; }
+.pop-flag {
+  width: 100%;
+  max-width: 140px;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.pop-name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+.pop-pop {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--accent);
+  min-height: 22px;       /* reserve space so layout doesn't jump on reveal */
+  letter-spacing: -0.01em;
+}
+.pop-side.is-correct .pop-pop { color: var(--good); }
+.pop-side.is-wrong   .pop-pop { color: var(--bad); }
+.pop-vs {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--text-faint);
+  padding: 8px 4px;
 }
 
 /* Subtle screen-shake on wrong */

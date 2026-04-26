@@ -6,7 +6,8 @@
 // returns 0..1) so the daily-challenge code can pass a deterministic
 // seeded RNG and get the same questions for everyone on a given date.
 
-const { COUNTRIES } = require("./countries");
+const { COUNTRIES }    = require("./countries");
+const { COUNTRY_DATA } = require("./countryData");
 
 const OPTIONS_PER_QUESTION = 4;
 
@@ -106,10 +107,86 @@ function buildDailyQuestionSet(dateStr, count = 10) {
   return buildQuestionSet(count, rng);
 }
 
+// =====================================================================
+// Capital game — show a city name, pick the country.
+// =====================================================================
+
+// Pre-filter: only countries we have a capital for (most do).
+const COUNTRIES_WITH_CAPITAL = COUNTRIES.filter((c) => COUNTRY_DATA[c.code]?.capital);
+
+function buildCapitalQuestion(country, rng = Math.random) {
+  // Same-continent distractors so wrong options feel plausible.
+  const distractors = pickDistractors(country, OPTIONS_PER_QUESTION - 1, rng);
+  const options = shuffle([country, ...distractors], rng).map((c) => c.name);
+  return {
+    capital:   COUNTRY_DATA[country.code].capital,
+    flagCode:  country.code,
+    options,
+    correct:   country.name,
+    continent: country.continent,
+    fact:      country.fact,
+  };
+}
+
+function buildCapitalQuestionSet(count = 10, rng = Math.random) {
+  const picks = shuffle(COUNTRIES_WITH_CAPITAL, rng).slice(0, count);
+  return picks.map((c) => buildCapitalQuestion(c, rng));
+}
+
+// =====================================================================
+// Population Showdown — pick the more-populous of two countries.
+// =====================================================================
+
+const COUNTRIES_WITH_POP = COUNTRIES.filter(
+  (c) => Number.isFinite(COUNTRY_DATA[c.code]?.population),
+);
+
+// We want the two countries to have an "interesting" ratio — not too
+// close (frustrating coin flip) and not absurdly far (boring obvious
+// answer). Empirically 1.3x → 6x feels right.
+const POP_RATIO_MIN = 1.3;
+const POP_RATIO_MAX = 6.0;
+
+function pickPopulationPair(rng) {
+  // Try a handful of times to find a pair within the target ratio band;
+  // fall back to whatever we drew last if nothing fits.
+  let pair = null;
+  for (let i = 0; i < 30; i++) {
+    const shuffled = shuffle(COUNTRIES_WITH_POP, rng);
+    const a = shuffled[0];
+    const b = shuffled[1];
+    const popA = COUNTRY_DATA[a.code].population;
+    const popB = COUNTRY_DATA[b.code].population;
+    const ratio = Math.max(popA, popB) / Math.min(popA, popB);
+    pair = { a, b };
+    if (ratio >= POP_RATIO_MIN && ratio <= POP_RATIO_MAX) break;
+  }
+  return pair;
+}
+
+function buildPopulationQuestion(rng = Math.random) {
+  const { a, b } = pickPopulationPair(rng);
+  const popA = COUNTRY_DATA[a.code].population;
+  const popB = COUNTRY_DATA[b.code].population;
+  // We send populations to the client so it can reveal them after the
+  // answer; the "correct" field tells us the bigger one.
+  return {
+    a: { code: a.code, name: a.name, population: popA, continent: a.continent },
+    b: { code: b.code, name: b.name, population: popB, continent: b.continent },
+    correct: popA >= popB ? "a" : "b",
+  };
+}
+
+function buildPopulationQuestionSet(count = 10, rng = Math.random) {
+  return Array.from({ length: count }, () => buildPopulationQuestion(rng));
+}
+
 module.exports = {
   buildQuestionSet,
   buildQuestion,
   buildDailyQuestionSet,
+  buildCapitalQuestionSet,
+  buildPopulationQuestionSet,
   dailyDateString,
   dailyDayNumber,
   OPTIONS_PER_QUESTION,
