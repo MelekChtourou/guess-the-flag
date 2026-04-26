@@ -19,10 +19,8 @@ guess-flag.mohamedmelekchtourou.com {
     -Server
   }
 
-  log {
-    output file /var/log/caddy/guess-flag.log {
-      roll_size 20mb
-      roll_keep 7
-    }
-  }
+  # Logs go to systemd journal by default — visible via:
+  #   sudo journalctl -u caddy -f | grep guess-flag
+  # Avoid `log { output file ... }` unless you've pre-touched the file
+  # with caddy:caddy ownership; otherwise reload silently fails to apply.
 }
