@@ -36,8 +36,11 @@
   let supported = true;
   let countryFeatures = null;   // [{ id, name, type, coords }, ...] from topojson-mini, or null
 
-  // Rotation + interaction.
-  const rot = { x: 0.41, y: 0, velX: 0, velY: 0 };
+  // Rotation + interaction. Initial pitch puts the equator on-screen;
+  // a small tilt (~10°) gives the globe a more "earth-like" feel without
+  // breaking the centering math (which assumes pitch is part of rot, not
+  // baked into the formula).
+  const rot = { x: 0.18, y: 0, velX: 0, velY: 0 };
   const AUTO_DRIFT_Y = 0.0025;
   const VEL_DECAY    = 0.94;
   const DRAG_SENS    = 0.005;
@@ -46,11 +49,24 @@
   let lastIdleAt = 0;
   const IDLE_RESUME_MS = 1500;
 
-  // Camera target (zoom). The earth's rotation tween happens in the
-  // same animation phase via `tween` below.
-  const CAM_OUT = 4.0;     // default position.z
-  const CAM_IN  = 2.4;     // when zoomed onto a country
-  let camZ = CAM_OUT;
+  // Camera target (zoom + framing).
+  //
+  // The clicked country needs to land in the *visible* part of the
+  // viewport — between the floating header at top and the games tray
+  // at bottom — not at the geometric center (where the tray hides it).
+  // We shift the camera DOWN on Y when zoomed in, which pushes the
+  // focus point UP on screen, into the visible band.
+  const CAM_OUT_Z = 4.0;
+  const CAM_IN_Z  = 2.4;
+  const CAM_OUT_Y = 0;
+  // -0.10 nudges the focused country slightly UP in the viewport so it
+  // sits comfortably between the header (top ~80px) and the tray
+  // (bottom ~280px). At z=2.4 with 35° FOV, this corresponds to
+  // ~12% of the viewport height — enough to escape the tray, not so
+  // much that the country flies out the top.
+  const CAM_IN_Y  = -0.10;
+  let camZ = CAM_OUT_Z;
+  let camY = CAM_OUT_Y;
 
   // Active tween for {rotX, rotY, camZ}. easeOutQuart for cinematic feel.
   let tween = null;
@@ -86,9 +102,20 @@
   // --- Spherical / texture-mapping helpers -------------------------
 
   // Apply earth's rotation so a given (lat,lng) faces the camera at +Z.
+  //
+  // Three.js applies Euler XYZ as M = Rx · Ry, which for a point P means
+  // P'' = Rx (Ry P) — Y rotation first, then X. To take the earth-local
+  // point at (lat, lng) to world (0, 0, 1):
+  //   1. Rotate around Y by -(lng + 90) so the longitude lands at +Z
+  //   2. Rotate around X by +lat so the latitude lifts the point to the equator
+  //
+  // The previous formula had the X sign flipped and a phantom +0.41 axial
+  // tilt baked in, which dragged every focus off-target by ~47°. The drift
+  // was barely noticeable for big landmasses (Brazil) but pushed smaller
+  // ones (France) clean off the visible viewport.
   function rotForLatLng(lat, lng) {
     return {
-      x: -lat * Math.PI / 180 + 0.41,
+      x: lat * Math.PI / 180,
       y: -(lng + 90) * Math.PI / 180,
     };
   }
@@ -302,6 +329,15 @@
 
   function handleTap(e) {
     if (!earth || !THREE) return;
+    // Force the camera + earth world matrices to match the very latest
+    // rotation/position values from the tween. Without these calls,
+    // setFromCamera() / worldToLocal() use whatever was cached on the
+    // last render — fine on a still globe but wrong by tens of degrees
+    // when the user clicks during (or immediately after) a tween.
+    // This was the "2nd click is always off" bug.
+    camera.updateMatrixWorld(true);
+    earth.updateMatrixWorld(true);
+
     const rect = renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width)  * 2 - 1,
@@ -381,12 +417,13 @@
 
   function tweenTo(lat, lng, opts = {}) {
     const target = (lat == null || lng == null)
-      ? { x: 0.41, y: rot.y }            // keep the current azimuth, level the pitch
+      ? { x: 0.18, y: rot.y }            // keep the current azimuth, level the pitch
       : rotForLatLng(lat, lng);
-    const targetZ = opts.zoom ? CAM_IN : CAM_OUT;
+    const targetZ = opts.zoom ? CAM_IN_Z : CAM_OUT_Z;
+    const targetY = opts.zoom ? CAM_IN_Y : CAM_OUT_Y;
     tween = {
-      fromX: rot.x,  fromY: rot.y,  fromZ: camZ,
-      toX:   target.x, toY: target.y, toZ: targetZ,
+      fromX: rot.x,  fromY: rot.y,  fromZ: camZ,  fromCamY: camY,
+      toX:   target.x, toY: target.y, toZ: targetZ, toCamY: targetY,
       t0:    performance.now(),
       dur:   TWEEN_MS,
     };
@@ -421,7 +458,7 @@
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(35, w / h, 0.1, 100);
-    camera.position.set(0, 0, CAM_OUT);
+    camera.position.set(0, CAM_OUT_Y, CAM_OUT_Z);
 
     const loader = new THREE.TextureLoader();
     loader.crossOrigin = "anonymous";
@@ -435,16 +472,20 @@
     });
 
     // Atmosphere — back-side Fresnel rim glow.
+    //
+    // Soft cool-white tint matching what a real atmosphere looks like
+    // from space (vs. the previous saturated amber, which dominated
+    // the screen). Lower exponent + lower max alpha keeps it subtle.
     const atmoMat = new THREE.ShaderMaterial({
       vertexShader:
         "varying vec3 vNormal; void main() { vNormal = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
       fragmentShader:
-        "varying vec3 vNormal; void main() { float i = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0); gl_FragColor = vec4(0.96, 0.78, 0.49, 1.0) * i; }",
+        "varying vec3 vNormal; void main() { float i = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.4); gl_FragColor = vec4(0.55, 0.72, 0.95, 0.55) * i; }",
       blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
       transparent: true,
     });
-    atmosphere = new THREE.Mesh(new THREE.SphereGeometry(1.20, 48, 48), atmoMat);
+    atmosphere = new THREE.Mesh(new THREE.SphereGeometry(1.16, 48, 48), atmoMat);
     scene.add(atmosphere);
 
     attachInteraction(renderer.domElement);
@@ -455,10 +496,11 @@
       if (tween) {
         const t = Math.min(1, (performance.now() - tween.t0) / tween.dur);
         const e = easeOutQuart(t);
-        rot.x = tween.fromX + (tween.toX - tween.fromX) * e;
-        rot.y = tween.fromY + (tween.toY - tween.fromY) * e;
-        camZ  = tween.fromZ + (tween.toZ - tween.fromZ) * e;
-        camera.position.z = camZ;
+        rot.x = tween.fromX    + (tween.toX    - tween.fromX)    * e;
+        rot.y = tween.fromY    + (tween.toY    - tween.fromY)    * e;
+        camZ  = tween.fromZ    + (tween.toZ    - tween.fromZ)    * e;
+        camY  = tween.fromCamY + (tween.toCamY - tween.fromCamY) * e;
+        camera.position.set(0, camY, camZ);
         if (t >= 1) { tween = null; lastIdleAt = performance.now(); }
       } else if (!dragging) {
         if (Math.abs(rot.velX) > 0.0001 || Math.abs(rot.velY) > 0.0001) {
@@ -469,7 +511,7 @@
           if (rot.x >  PITCH_LIMIT) { rot.x =  PITCH_LIMIT; rot.velX = 0; }
           if (rot.x < -PITCH_LIMIT) { rot.x = -PITCH_LIMIT; rot.velX = 0; }
           lastIdleAt = performance.now();
-        } else if (performance.now() - lastIdleAt > IDLE_RESUME_MS && camZ > CAM_OUT - 0.05) {
+        } else if (performance.now() - lastIdleAt > IDLE_RESUME_MS && camZ > CAM_OUT_Z - 0.05) {
           // Only auto-spin when fully zoomed out.
           rot.y += AUTO_DRIFT_Y;
         }
@@ -513,6 +555,45 @@
     if (menu) observer.observe(menu, { attributes: true, attributeFilter: ["class"] });
   });
 
+  // Find a country feature by alpha-2 code (loaded TopoJSON only).
+  function featureByCode(code) {
+    if (!countryFeatures) return null;
+    return countryFeatures.find((f) => f.alpha2 === code) || null;
+  }
+
+  // Compute a representative lat/lng for a country — naive centroid of
+  // its first ring. Good enough for camera framing.
+  function countryCentroid(feature) {
+    let ring;
+    if (feature.type === "Polygon") ring = feature.coords[0];
+    else if (feature.type === "MultiPolygon") {
+      // Pick the largest ring (most vertices = main landmass).
+      let best = null, bestN = 0;
+      for (const poly of feature.coords) {
+        if (poly[0] && poly[0].length > bestN) { best = poly[0]; bestN = poly[0].length; }
+      }
+      ring = best;
+    }
+    if (!ring || !ring.length) return null;
+    let sx = 0, sy = 0;
+    for (const [lng, lat] of ring) { sx += lng; sy += lat; }
+    return { lat: sy / ring.length, lng: sx / ring.length };
+  }
+
+  // Public: focus a country by code — tween + zoom + border draw +
+  // notify listeners (so menu's setCountry path fires too).
+  function focusCountry(code, name) {
+    const feature = featureByCode(code);
+    if (!feature) return false;
+    const c = countryCentroid(feature);
+    if (!c) return false;
+    tweenTo(c.lat, c.lng, { zoom: true });
+    placeMarker(c.lat, c.lng);
+    drawBorders(feature);
+    countryListeners.forEach((fn) => { try { fn(code, name || feature.name); } catch (_) {} });
+    return true;
+  }
+
   window.Globe = {
     boot,
     isSupported: () => supported,
@@ -522,6 +603,7 @@
       const c = CONTINENTS.find((x) => x.id === id);
       if (c) { tweenTo(c.lat, c.lng, { zoom: false }); placeMarker(c.lat, c.lng); }
     },
+    focusCountry,
     clearSelection() {
       clearMarker(); clearBorders(); tweenTo(null, null, { zoom: false });
     },

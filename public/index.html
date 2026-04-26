@@ -64,7 +64,10 @@
         <div id="atlas-stage">
           <div id="globe-canvas" aria-hidden="true"></div>
           <div id="hero-fallback" aria-hidden="true" hidden>🌍</div>
-          <div class="atlas-starfield" aria-hidden="true"></div>
+          <div class="atlas-starfield" aria-hidden="true">
+            <div class="star-layer star-near" id="stars-near"></div>
+            <div class="star-layer star-far"  id="stars-far"></div>
+          </div>
           <div class="atlas-vignette" aria-hidden="true"></div>
         </div>
 
@@ -158,7 +161,40 @@
         <button id="menu-stats" class="atlas-profile-fab" data-action="stats" aria-label="Stats">
           <span id="profile-level">Lv. 0</span>
         </button>
+
+        <!--
+          Country search FAB — top-left, just below the brand. Opens a
+          full-screen sheet with all countries (flag + name), filterable
+          by typing. Tapping a row focuses it on the globe.
+        -->
+        <button id="country-picker-fab" class="country-picker-fab" data-action="open-picker" aria-label="Search countries">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.5" y2="16.5"/>
+          </svg>
+        </button>
       </section>
+
+      <!-- =========================================================== -->
+      <!-- COUNTRY PICKER MODAL                                         -->
+      <!-- Lives at root (not inside #screen-menu) so it can overlay    -->
+      <!-- the entire app at any moment.                                -->
+      <!-- =========================================================== -->
+      <div id="country-picker" class="country-picker" hidden>
+        <div class="picker-backdrop" data-action="close-picker"></div>
+        <div class="picker-sheet" role="dialog" aria-label="Search countries">
+          <header class="picker-header">
+            <input id="picker-search" class="picker-search" type="search"
+                   autocomplete="off" autocorrect="off" autocapitalize="off"
+                   placeholder="Search a country…" />
+            <button class="picker-close" data-action="close-picker" aria-label="Close">×</button>
+          </header>
+          <div class="picker-body">
+            <ul id="picker-list" class="picker-list" role="listbox"></ul>
+            <div id="picker-empty" class="picker-empty" hidden>No country matches that.</div>
+          </div>
+        </div>
+      </div>
 
       <!-- =========================================================== -->
       <!-- STATS                                                        -->

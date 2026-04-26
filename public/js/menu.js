@@ -144,6 +144,131 @@
     return String(n);
   }
 
+  // --- Country picker ----------------------------------------------
+  //
+  // Lazy-loaded list (one fetch on first open, cached for the session).
+  // Search-as-you-type filters by name; Enter / tap selects.
+
+  let countryList = null;        // [{code, name, continent}, ...]
+  let pickerRendered = false;    // initial DOM populated?
+
+  async function ensureCountries() {
+    if (countryList) return countryList;
+    try {
+      const res = await fetch("/api/countries");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      countryList = (data.countries || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    } catch (e) {
+      countryList = [];
+    }
+    return countryList;
+  }
+
+  function renderPickerList(filter = "") {
+    const ul = $("picker-list");
+    const empty = $("picker-empty");
+    if (!ul) return;
+    const q = filter.trim().toLowerCase();
+    const items = (countryList || []).filter((c) =>
+      !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().startsWith(q),
+    );
+    if (items.length === 0) {
+      ul.innerHTML = "";
+      empty.hidden = false;
+      return;
+    }
+    empty.hidden = true;
+    // Build via innerHTML for one batched paint.
+    ul.innerHTML = items.map((c) => `
+      <li role="option">
+        <button class="picker-row" data-code="${c.code}" data-name="${escapeAttr(c.name)}">
+          <img class="picker-flag" loading="lazy" src="https://flagcdn.com/w40/${c.code}.png" alt="" />
+          <span class="picker-row-name">${escapeHtml(c.name)}</span>
+          <span class="picker-row-region">${escapeHtml(c.continent || "")}</span>
+        </button>
+      </li>
+    `).join("");
+  }
+  function escapeHtml(s)  { return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+  function escapeAttr(s)  { return escapeHtml(s); }
+
+  async function openPicker() {
+    const modal = $("country-picker");
+    const search = $("picker-search");
+    if (!modal) return;
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    // Lazy-load countries on first open
+    if (!pickerRendered) {
+      await ensureCountries();
+      renderPickerList("");
+      pickerRendered = true;
+    }
+    // Focus input — defer slightly so iOS lifts the keyboard.
+    setTimeout(() => { if (search) { search.value = ""; renderPickerList(""); search.focus(); } }, 80);
+  }
+
+  function closePicker() {
+    const modal = $("country-picker");
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = "";
+  }
+
+  function pickFromPicker(code, name) {
+    closePicker();
+    if (!window.Globe || typeof window.Globe.focusCountry !== "function") {
+      // Topojson hasn't loaded — fall back to setCountry without zoom.
+      setCountry(code, name);
+      return;
+    }
+    const ok = window.Globe.focusCountry(code, name);
+    if (!ok) {
+      // Country not in our topojson polygons (small/disputed) — at
+      // least show the card.
+      setCountry(code, name);
+    }
+  }
+
+  // --- Starfield generator ----------------------------------------
+  //
+  // Builds two long box-shadow strings — one for "near" stars (slightly
+  // bigger + brighter) and one for "far" stars (smaller + dimmer). One
+  // 1×1 px element per layer absorbs the whole shadow list, so the cost
+  // stays minimal even with hundreds of stars.
+  //
+  // We size the field generously above viewport so layout shifts /
+  // landscape rotation don't reveal seams.
+
+  function generateStarfield() {
+    const near = document.getElementById("stars-near");
+    const far  = document.getElementById("stars-far");
+    if (!near || !far) return;
+
+    // Field extent: be generous so portrait→landscape rotation doesn't
+    // expose blank corners. Use viewport units multiplied at boot.
+    const W = Math.max(window.innerWidth,  1024);
+    const H = Math.max(window.innerHeight, 1024);
+
+    const NEAR_COUNT = 70;       // bigger / brighter
+    const FAR_COUNT  = 130;      // smaller / dimmer
+
+    near.style.boxShadow = makeStarShadow(NEAR_COUNT, W, H, [0.55, 0.95]);
+    far.style.boxShadow  = makeStarShadow(FAR_COUNT,  W, H, [0.25, 0.6 ]);
+  }
+
+  function makeStarShadow(count, w, h, alphaRange) {
+    const parts = [];
+    for (let i = 0; i < count; i++) {
+      const x = Math.floor(Math.random() * w);
+      const y = Math.floor(Math.random() * h);
+      const a = (alphaRange[0] + Math.random() * (alphaRange[1] - alphaRange[0])).toFixed(2);
+      parts.push(`${x}px ${y}px 0 0 rgba(255,255,255,${a})`);
+    }
+    return parts.join(", ");
+  }
+
   // --- Daily quick link refresh ------------------------------------
 
   async function refreshDailyQuick() {
@@ -263,6 +388,51 @@
       }
     });
 
+    // Open / close country picker.
+    document.addEventListener("click", (e) => {
+      const open = e.target.closest('[data-action="open-picker"]');
+      if (open) {
+        e.stopImmediatePropagation();
+        if (window.Sound) window.Sound.play("tap");
+        openPicker();
+        return;
+      }
+      const close = e.target.closest('[data-action="close-picker"]');
+      if (close) {
+        e.stopImmediatePropagation();
+        closePicker();
+        return;
+      }
+      // Row tap inside the picker → focus that country.
+      const row = e.target.closest('.picker-row');
+      if (row) {
+        e.stopImmediatePropagation();
+        if (window.Sound) window.Sound.play("tap");
+        pickFromPicker(row.dataset.code, row.dataset.name);
+      }
+    });
+
+    // Live search filter.
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.id === "picker-search") {
+        renderPickerList(e.target.value || "");
+      }
+    });
+
+    // Esc closes the picker; Enter on search picks the first match.
+    document.addEventListener("keydown", (e) => {
+      const modal = document.getElementById("country-picker");
+      if (!modal || modal.hidden) return;
+      if (e.key === "Escape") { e.preventDefault(); closePicker(); }
+      if (e.key === "Enter" && e.target && e.target.id === "picker-search") {
+        const first = document.querySelector('.picker-row');
+        if (first) {
+          e.preventDefault();
+          pickFromPicker(first.dataset.code, first.dataset.name);
+        }
+      }
+    });
+
     // Wire globe → country card (primary path) and continent label (fallback).
     if (window.Globe && typeof window.Globe.onCountrySelected === "function") {
       window.Globe.onCountrySelected((code, name) => setCountry(code, name));
@@ -270,6 +440,10 @@
     if (window.Globe && typeof window.Globe.onContinentSelected === "function") {
       window.Globe.onContinentSelected((id) => setContinent(id));
     }
+
+    // Generate the starfield once at boot — denser than what we can
+    // reasonably express in CSS, with two parallax-y layers.
+    generateStarfield();
 
     // Auto-fade the onboarding hint after a few seconds even if the user
     // hasn't tapped anywhere yet — keeps the menu uncluttered on long views.

@@ -309,28 +309,31 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 #atlas-stage #globe-canvas::before { display: none; }
 #atlas-stage canvas { width: 100% !important; height: 100% !important; display: block; }
 
-/* Subtle starfield via tiny dots painted on a fixed background. */
+/* Dense starfield — populated dynamically by menu.js via a single
+   element with a long box-shadow string. Two layers (#stars-near
+   and #stars-far) give a parallax-style depth: bigger/brighter on
+   one, smaller/dimmer on the other, each with its own twinkle phase. */
 .atlas-starfield {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image:
-    radial-gradient(2px 2px at 20% 30%, rgba(255,255,255,0.55), transparent 100%),
-    radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.7),  transparent 100%),
-    radial-gradient(2px 2px at 35% 75%, rgba(255,255,255,0.5),  transparent 100%),
-    radial-gradient(1px 1px at 85% 25%, rgba(255,255,255,0.6),  transparent 100%),
-    radial-gradient(2px 2px at 55% 50%, rgba(255,255,255,0.45), transparent 100%),
-    radial-gradient(1px 1px at 12% 60%, rgba(255,255,255,0.6),  transparent 100%),
-    radial-gradient(2px 2px at 90% 60%, rgba(255,255,255,0.5),  transparent 100%),
-    radial-gradient(1px 1px at 45% 18%, rgba(255,255,255,0.65), transparent 100%);
-  opacity: 0.7;
-  animation: starfield-twinkle 8s ease-in-out infinite alternate;
+  overflow: hidden;
 }
+.atlas-starfield .star-layer {
+  position: absolute;
+  top: 0; left: 0;
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  border-radius: 50%;
+  /* Each layer's actual stars are painted as box-shadows; the element
+     itself is just a dot anchor. */
+}
+.atlas-starfield .star-near  { animation: stars-twinkle-a 9s ease-in-out infinite alternate; }
+.atlas-starfield .star-far   { animation: stars-twinkle-b 13s ease-in-out infinite alternate; }
 [data-theme="light"] .atlas-starfield { display: none; }
-@keyframes starfield-twinkle {
-  from { opacity: 0.4; }
-  to   { opacity: 0.85; }
-}
+@keyframes stars-twinkle-a { from { opacity: 0.45; } to { opacity: 0.95; } }
+@keyframes stars-twinkle-b { from { opacity: 0.30; } to { opacity: 0.75; } }
 
 /* Vignette darkens the edges so the globe pops in the center. */
 .atlas-vignette {
@@ -399,6 +402,29 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
   color: #1a1206;
 }
 .mode-chip:not(.is-active):hover { color: var(--text); background: var(--surface); }
+
+/* Floating search button — sits below the profile fab, top-left. */
+.country-picker-fab {
+  position: absolute;
+  top: max(132px, calc(env(safe-area-inset-top) + 116px));
+  left: 16px;
+  z-index: 10;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 200ms var(--ease), transform 100ms var(--ease);
+}
+.country-picker-fab:hover { background: var(--surface-hover); }
+.country-picker-fab:active { transform: scale(0.94); }
 
 /* Floating profile badge top-left. */
 .atlas-profile-fab {
@@ -482,6 +508,127 @@ body:has(.screen-menu-fullscreen.screen-active)::before { opacity: 0.04; }
 
 @media (prefers-reduced-motion: reduce) {
   .atlas-hint, .atlas-hint-ping .ping-ring { animation: none; opacity: 1; }
+}
+
+/* --- Country picker modal -------------------------------------- */
+
+.country-picker[hidden] { display: none !important; }
+.country-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeIn 220ms var(--ease);
+}
+.picker-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.picker-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 88dvh;
+  background: var(--bg-base);
+  border-top: 1px solid var(--border-strong);
+  border-radius: var(--radius) var(--radius) 0 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -20px 60px rgba(0,0,0,0.4);
+  animation: pickerSlideUp 320ms var(--ease);
+}
+@keyframes pickerSlideUp {
+  from { transform: translateY(20px); opacity: 0.6; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.picker-search {
+  flex: 1;
+  min-height: 44px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 16px;       /* prevent iOS zoom-on-focus */
+  color: var(--text);
+  outline: none;
+  font-family: var(--font);
+}
+.picker-search::placeholder { color: var(--text-faint); }
+.picker-search:focus { border-color: var(--accent); background: var(--surface-strong); }
+.picker-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 22px;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+.picker-close:hover { color: var(--text); background: var(--surface-hover); }
+
+.picker-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 6px 0 max(8px, env(safe-area-inset-bottom));
+}
+.picker-list { display: flex; flex-direction: column; }
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background 160ms var(--ease);
+  min-height: 56px;
+}
+.picker-row:hover, .picker-row:focus { background: var(--surface); outline: 0; }
+.picker-row:active { background: var(--surface-hover); }
+.picker-flag {
+  width: 36px;
+  height: 24px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.picker-row-name { flex: 1; font-size: 15px; font-weight: 600; color: var(--text); }
+.picker-row-region { font-size: 12px; color: var(--text-faint); }
+
+.picker-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* On wider screens, center the sheet vertically and cap its width. */
+@media (min-width: 768px) {
+  .country-picker { align-items: center; }
+  .picker-sheet {
+    max-width: 480px;
+    max-height: 76dvh;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+  }
 }
 
 /* --- Country detail card (primary) ------------------------------- */

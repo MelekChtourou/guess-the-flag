@@ -48,6 +48,19 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 // an inline SVG. Returning 204 stops the noisy 404 in DevTools.
 app.get("/favicon.ico", (req, res) => res.status(204).end());
 
+// Full country list — used by the menu's country picker (search + select).
+// Returns just enough to render a row per country; no heavy data.
+app.get("/api/countries", (req, res) => {
+  res.set("Cache-Control", "public, max-age=86400");
+  res.json({
+    countries: COUNTRIES.map((c) => ({
+      code: c.code,
+      name: c.name,
+      continent: c.continent,
+    })),
+  });
+});
+
 // Country summary — synchronous, lightweight version of /api/country/:code
 // that reads only from the in-memory dataset (server/countries.js +
 // server/countryData.js). No Wikipedia / REST Countries calls. Used by
